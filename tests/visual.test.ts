@@ -185,8 +185,8 @@ describe('sohbet, grafik, liste, yakınlaşma, kaynak', () => {
     }
   });
 
-  it('yakınlaşma ve ses efektleri', async () => {
-    const {zoomAt, sfxEvents, ZOOM_SCALE} = await import('../src/shared/timeline');
+  it('yakınlaşma', async () => {
+    const {zoomAt, ZOOM_SCALE} = await import('../src/shared/timeline');
     const sc = (id: string, a: number, b: number, props: Scene['props'], danger = false): Scene => ({id, markerId: id, line: 1, kind: 'ANİM', suggested: false, danger, startSec: a, endSec: b, anchorText: '', props});
     const f: ScenesFile = {
       version: 1,
@@ -202,16 +202,5 @@ describe('sohbet, grafik, liste, yakınlaşma, kaynak', () => {
     };
     assert.equal(zoomAt(f, 30), 1);
     assert.ok(Math.abs(zoomAt(f, 90) - ZOOM_SCALE) < 1e-9, 'ortada tam yakın');
-    const ev = sfxEvents(f, {includeSuggested: true, crossfadeFrames: 12, chapterCard: {enabled: true, seconds: 2.4}});
-    assert.deepEqual(
-      ev.map((e) => [e.frame, e.sound]),
-      [
-        [60, 'pop'],
-        [300, 'glitch'],
-        [310, 'tick'],
-        [402, 'tick'],
-        [900, 'blip'],
-      ],
-    );
   });
 });

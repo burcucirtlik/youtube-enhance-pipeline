@@ -187,7 +187,7 @@ Açılan **Galeri** kompozisyonu bütün animasyon türlerini örnek verilerle g
 
 Yan yana yerleşimde uygulamanın önizlemesi soldaki yüzü kırpmaz (video olduğu gibi altta oynar); render kırpar.
 
-**Otomatik:** her `##` bölümünün başında (açılış hariç) sol üstte 2,4 sn'lik bölüm kartı (`brand.chapterCard`). Görsel girişlerinde kısık ses efektleri (`brand.sound`): tam ekran → whoosh, tehlike tonu → glitch, vurgu/yakınlaşma → pop, alt bant/kaynak/bölüm kartı → blip, rakam/grafik/liste maddesi → tık. Sesler `scripts/make-sfx.sh` ile ffmpeg'de sentezlenir (`brand/sfx/`, lisans yok). Tam render'da Remotion, parça render'da ffmpeg (adelay + amix) karıştırır; önizleme sessiz.
+**Otomatik:** her `##` bölümünün başında (açılış hariç) sol üstte 2,4 sn'lik bölüm kartı (`brand.chapterCard`). Ses efekti yok: videonun sesi yalnızca kurgu kaydı (parça render'da kopyalanır, yeniden kodlanmaz).
 
 Eksik bir varlık render'ı durdurmaz: o sahne "EKSİK GÖRSEL" yer tutucusuyla çizilir ve raporda listelenir.
 

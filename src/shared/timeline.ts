@@ -71,27 +71,3 @@ export const chapterCards = (data: ScenesFile, opts: {enabled: boolean; seconds:
   const fps = compositionFps(data);
   return data.chapters.slice(1).map((ch, i) => ({n: i + 2, title: ch.title, from: Math.round(ch.startSec * fps), durationInFrames: Math.round(opts.seconds * fps)}));
 };
-
-// ── Ses efektleri ───────────────────────────────────────────────────────────
-
-export type SfxName = 'whoosh' | 'tick' | 'pop' | 'glitch' | 'blip';
-export type SfxEvent = {frame: number; sound: SfxName; gain: number};
-
-/**
- * Hangi an hangi sesi alır. Render (Main.tsx, <Audio>) ve parça render (ffmpeg karışımı) aynı listeyi kullanır.
- * Peş peşe görseller arasındaki yumuşak çapraz geçiş sessizdir.
- */
-export const sfxEvents = (data: ScenesFile, opts: {includeSuggested: boolean; crossfadeFrames: number; chapterCard: {enabled: boolean; seconds: number}}): SfxEvent[] => {
-  const fps = compositionFps(data);
-  const out: SfxEvent[] = [];
-  for (const q of sceneSequences(data, opts)) {
-    const t = q.scene.props.type;
-    if (t === 'emphasis' || t === 'zoom') out.push({frame: q.from, sound: 'pop', gain: 0.8});
-    else if (t === 'lower' || t === 'source') out.push({frame: q.from, sound: 'blip', gain: 0.7});
-    else if (!q.joinedPrev) out.push({frame: q.from, sound: q.scene.danger ? 'glitch' : 'whoosh', gain: 1});
-    if (q.scene.props.type === 'list') for (const it of q.scene.props.items.slice(1)) out.push({frame: q.from + Math.round((it.offsetSec ?? 0) * fps), sound: 'tick', gain: 0.8});
-    if (q.scene.props.type === 'stat' || q.scene.props.type === 'chart') out.push({frame: q.from + 10, sound: 'tick', gain: 0.7});
-  }
-  for (const c of chapterCards(data, opts.chapterCard)) out.push({frame: c.from, sound: 'blip', gain: 0.6});
-  return out.sort((a, b) => a.frame - b.frame);
-};

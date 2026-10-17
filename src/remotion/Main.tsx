@@ -1,8 +1,7 @@
 import React from 'react';
 import {AbsoluteFill, Audio, OffthreadVideo, Sequence, useCurrentFrame} from 'remotion';
 import {brand} from '../../brand/brand';
-import {chapterCards, compositionFps, sceneSequences, sfxEvents, ZOOM_ORIGIN, zoomAt} from '../shared/timeline';
-import {SFX} from './sfx';
+import {chapterCards, sceneSequences, ZOOM_ORIGIN, zoomAt} from '../shared/timeline';
 import {ChapterCard} from './scenes/Overlay';
 import type {ScenesFile} from '../shared/types';
 import {SceneShell} from './SceneShell';
@@ -28,7 +27,6 @@ const Timeline: React.FC<Omit<MainProps, 'assetBase'>> = ({data, includeSuggeste
   if (!data) return null;
   // YAKIN: kurgu kaydı kısa süre yüze yaklaşır (yalnızca render; önizlemede Editor aynı hesabı videoya uygular).
   const zoom = zoomAt(data, frame);
-  const fps = compositionFps(data);
   const {base} = data;
   const seqs = sceneSequences(data, {includeSuggested, crossfadeFrames: brand.motion.crossfadeFrames});
   return (
@@ -51,14 +49,6 @@ const Timeline: React.FC<Omit<MainProps, 'assetBase'>> = ({data, includeSuggeste
           />
         </Sequence>
       ))}
-      {/* Ses efektleri: yalnızca tam render'da (katman ve önizleme sessiz). */}
-      {!overlayOnly && brand.sound.enabled
-        ? sfxEvents(data, {includeSuggested, crossfadeFrames: brand.motion.crossfadeFrames, chapterCard: brand.chapterCard}).map((e, i) => (
-            <Sequence key={`sfx${i}`} from={e.frame} durationInFrames={Math.round(0.6 * fps)} name={`ses: ${e.sound}`}>
-              <Audio src={SFX[e.sound]} volume={brand.sound.volume * e.gain} />
-            </Sequence>
-          ))
-        : null}
       {chapterCards(data, brand.chapterCard).map((c) => (
         <Sequence key={`b${c.n}`} from={c.from} durationInFrames={c.durationInFrames} name={`bölüm ${c.n}: ${c.title}`}>
           <ChapterCard n={c.n} title={c.title} />
