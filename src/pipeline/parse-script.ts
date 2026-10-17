@@ -1,8 +1,29 @@
 // script.md / script.final.md okuyucu. Başlık bloğu, ## bölümleri, konuşulan cümleler ve 📍 işaretleri.
 
+import crypto from 'node:crypto';
 import type {Marker, ScriptHeader, Sentence, VideoFormat} from '../shared/types';
 import {HAS_MARKER, MARKER_LINE, MarkerError, parseMarker, RETIRED_MARKER} from './markers';
 import {splitSentences, stripMarkdown, tokenize} from './text';
+
+/** Eski sıra numaralı kimlik (m001…): yalnızca eski edits.json kayıtlarını taşımak için. */
+export const sequentialId = (i: number) => `m${String(i + 1).padStart(3, '0')}`;
+
+/**
+ * Kalıcı işaret kimliği: bağlı olduğu cümle + işaret türü + o cümledeki aynı türden işaretler arasındaki sırası.
+ * Script'e başka yerde işaret eklemek, bir önerinin ?'ini silmek ya da animasyon metnini düzeltmek kimliği
+ * değiştirmez; editör düzenlemeleri (build/edits.json) bu kimliğe bağlı olduğu için doğru sahnede kalır.
+ */
+const stableIds = (markers: Marker[], sentences: Sentence[]) => {
+  const seen = new Map<string, number>();
+  for (const m of markers) {
+    const anchor = m.sentenceIndex >= 0 ? tokenize(sentences[m.sentenceIndex].text).join(' ') : `satir-${m.line}`;
+    const kind = m.anim ?? m.props.type;
+    const base = `${anchor}|${kind}`;
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    m.id = 'k' + crypto.createHash('sha1').update(`${base}|${n}`).digest('hex').slice(0, 8);
+  }
+};
 
 export type Issue = {line: number; level: 'hata' | 'uyarı' | 'bilgi'; msg: string};
 
@@ -129,7 +150,7 @@ export const parseScript = (source: string): ParsedScript => {
       continue;
     }
     if (mm) {
-      const id = `m${String(markers.length + 1).padStart(3, '0')}`;
+      const id = sequentialId(markers.length); // geçici; parse sonunda kalıcı kimlik atanır
       try {
         const p = parseMarker(mm[1]);
         for (const msg of p.issues) issues.push({line: lineNo, level: 'uyarı', msg});
@@ -174,5 +195,6 @@ export const parseScript = (source: string): ParsedScript => {
     prev = 'text';
   }
 
+  stableIds(markers, sentences);
   return {header, sentences, words, wordSentence, markers, sections, trailing, issues, lines};
 };

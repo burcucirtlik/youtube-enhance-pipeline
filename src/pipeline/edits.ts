@@ -7,7 +7,7 @@ import type {Scene, ScenesFile} from '../shared/types';
 import {paths} from './util';
 
 export type SceneEdit = {startSec?: number; endSec?: number; disabled?: boolean};
-export type Edits = Record<string, SceneEdit>; // key: scene.markerId (çoklu fotoğrafta "m012#2")
+export type Edits = Record<string, SceneEdit>; // key: scene.markerId — kalıcı kimlik (ör. "k3f9a1c2", çoklu fotoğrafta "k3f9a1c2#2")
 
 const editsFile = (dir: string) => path.join(paths(dir).build, 'edits.json');
 
@@ -19,6 +19,31 @@ export const loadEdits = (dir: string): Edits => {
 export const saveEdits = (dir: string, edits: Edits) => {
   fs.mkdirSync(paths(dir).build, {recursive: true});
   fs.writeFileSync(editsFile(dir), JSON.stringify(edits, null, 1));
+};
+
+/**
+ * Eski sıra numaralı kayıtları (m001…) kalıcı kimliklere taşır. Eski numara = işaretin script'teki sırası.
+ * Bir kez çalışır: taşıdıktan sonra dosyada m001 biçiminde anahtar kalmaz. Yedek: build/edits.m-ids.bak.json
+ */
+export const migrateEdits = (dir: string, markerIdsInOrder: string[]): {migrated: number; dropped: string[]} => {
+  const edits = loadEdits(dir);
+  const old = Object.keys(edits).filter((k) => /^m\d{3}(#\d+)?$/.test(k));
+  if (!old.length) return {migrated: 0, dropped: []};
+  fs.writeFileSync(path.join(paths(dir).build, 'edits.m-ids.bak.json'), JSON.stringify(edits, null, 1));
+  const out: Edits = {};
+  const dropped: string[] = [];
+  for (const [k, v] of Object.entries(edits)) {
+    const m = k.match(/^m(\d{3})(#\d+)?$/);
+    if (!m) {
+      out[k] = v;
+      continue;
+    }
+    const id = markerIdsInOrder[Number(m[1]) - 1];
+    if (id) out[id + (m[2] ?? '')] = v;
+    else dropped.push(k);
+  }
+  saveEdits(dir, out);
+  return {migrated: old.length - dropped.length, dropped};
 };
 
 /** Hizalamanın ürettiği sahnelere kayıtlı düzenlemeleri uygular. */

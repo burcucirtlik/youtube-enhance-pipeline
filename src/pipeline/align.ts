@@ -6,7 +6,7 @@ import type {Chapter, Marker, Scene, SceneProps, ScenesFile} from '../shared/typ
 import type {ParsedScript} from './parse-script';
 import {levenshtein, normalizeWord} from './text';
 import {loadCandidateSet, loadRegistry, withCredit} from './commons';
-import {applyEdits, loadEdits} from './edits';
+import {applyEdits, loadEdits, migrateEdits} from './edits';
 import {assetKey, ffprobe, paths, rel, type Probe} from './util';
 
 export type Transcript = {duration: number; words: {w: string; start: number; end: number; p?: number}[]};
@@ -305,6 +305,9 @@ export const buildScenes = (
     warnings,
   };
   // Editör düzenlemeleri (kaydırma, kısaltma, silme) ham hizalamanın üstüne biner.
+  const mig = migrateEdits(dir, s.markers.map((m) => m.id));
+  if (mig.migrated) warnings.push(`${mig.migrated} eski editör düzenlemesi kalıcı işaret kimliklerine taşındı`);
+  if (mig.dropped.length) warnings.push(`Eşleşmeyen eski düzenleme: ${mig.dropped.join(', ')}`);
   const edits = loadEdits(dir);
   const applied = applyEdits(result, edits);
   const editedCount = applied.scenes.filter((x) => x.edited || x.disabled).length;
