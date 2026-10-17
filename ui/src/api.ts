@@ -100,19 +100,5 @@ export const STATUS_LABEL: Record<Status, string> = {
   hata: 'Hata',
 };
 
-export const TYPE_LABEL: Record<string, string> = {
-  flow: 'Akış',
-  compare: 'Karşılaştırma',
-  table: 'Tablo',
-  timeline: 'Zaman çizelgesi',
-  stat: 'Rakam',
-  quote: 'Alıntı',
-  terminal: 'Terminal',
-  code: 'Kod',
-  concept: 'Kavram',
-  screen: 'Ekran kaydı',
-  news: 'Haber',
-  document: 'Belge',
-  photo: 'Fotoğraf',
-  post: 'Gönderi',
-};
+/** Sahne türü etiketleri işaret sözlüğünden (src/shared/marker-schema.ts). */
+export {TYPE_LABEL} from '../../src/shared/marker-schema';

@@ -148,6 +148,8 @@ Açılan **Galeri** kompozisyonu bütün animasyon türlerini örnek verilerle g
 
 ## İşaret → sahne eşlemesi
 
+İşaret türlerinin tek kaynağı `src/shared/marker-schema.ts`: parser'ın tanıdığı türler, TypeScript türleri, arayüz etiketleri ve skill'deki sözlük bloğu oradan türer. Şemayı değiştirince `npm run skill:sync` SKILL.md'deki bloğu yeniden yazar; test, bloğun şemayla aynı olduğunu ve her örneğin parser'dan hatasız geçtiğini denetler.
+
 | İşaret | Sahne | Girdi |
 |---|---|---|
 | `ANİM: flow / compare / table / timeline / stat / quote / concept` | Kodla çizilen animasyon | script'teki metin |

@@ -176,28 +176,30 @@ Scriptler artık doğrudan bir video pipeline'ına (Remotion) girdi oluyor. Pipe
 
 Sadece bu türleri kullan; yeni tür uydurma. Bir anı hiçbiri karşılamıyorsa en yakını seç ve "Kayıttan Önce Doğrulanacaklar"a not düş.
 
+<!-- işaret-sözlüğü: başla — src/shared/marker-schema.ts üretir (npm run skill:sync), elle düzenleme -->
 **Animasyonlar (kodla çizilir):**
 ```
-📍 [ANİM: flow — "adım 1" → "adım 2" → "adım 3"]          süreç, sıralama, neden-sonuç zinciri
-📍 [ANİM: compare — "A: ..." vs "B: ..."]                  iki şeyin karşılaştırması
-📍 [ANİM: table — başlıklar | satır 1 | satır 2]           çok kalemli karşılaştırma
+📍 [ANİM: flow — "adım 1" → "adım 2" → "adım 3"]            süreç, sıralama, neden-sonuç zinciri
+📍 [ANİM: compare — "A: ..." vs "B: ..."]                   iki şeyin karşılaştırması
+📍 [ANİM: table — "başlık", "başlık" | "satır", "değer"]    çok kalemli karşılaştırma
 📍 [ANİM: timeline — "2015: ..." → "2022: ..." → "bugün"]   zaman çizelgesi
 📍 [ANİM: stat — "13 milyar $", "iki yılda"]                tek çarpıcı rakam
 📍 [ANİM: quote — "alıntı metni", "Ad Soyad"]               bir kişinin sözü (gönderi değilse)
-📍 [ANİM: terminal — `komut`]                                komut satırı (teknik eğitim)
-📍 [ANİM: code — dosya.js, satır 4 vurgula]                  kod bloğu (teknik eğitim)
-📍 [ANİM: concept — "kavramın adı"]                          kanal kavramı / terim kartı
+📍 [ANİM: terminal — `komut`]                               komut satırı (teknik eğitim)
+📍 [ANİM: code — dosya.js, satır 4 vurgula]                 kod bloğu (teknik eğitim)
+📍 [ANİM: concept — "kavramın adı"]                         kanal kavramı / terim kartı
 ```
 
 **Gerçek görseller:**
 ```
-📍 [EKRAN: screen-01.mp4, ne vurgulanacak]                     ekran kaydı
-📍 [HABER: https://link, vurgula: "haberdeki metin"]           haber/makale + fosforlu kalem
-📍 [BELGE: dosya-adi.pdf, s. 12, vurgula: "belgedeki metin"]   rapor, makale PDF'i, mahkeme dosyası
-📍 [FOTO: dosya-adi.jpg, "Ad Soyad, unvan"]                    gerçek fotoğraf: kişi, yer, olay, belge
+📍 [EKRAN: screen-01.mp4, ne vurgulanacak]                             ekran kaydı
+📍 [HABER: https://link, vurgula: "haberdeki metin"]                   haber/makale + fosforlu kalem
+📍 [BELGE: dosya-adi.pdf, s. 12, vurgula: "belgedeki metin"]           rapor, makale PDF'i, mahkeme dosyası
+📍 [FOTO: dosya-adi.jpg, "Ad Soyad, unvan"]                            gerçek fotoğraf: kişi, yer, olay, belge
 📍 [FOTO: dosya-adi.jpg, "Olay, tarih", ara: "english search query"]   arşiv fotoğrafı: pipeline Commons'ta aday arar
-📍 [POST: platform, @kullanici, "gönderi metni"]               tweet / sosyal medya gönderisi
+📍 [POST: platform, @kullanici, "gönderi metni"]                       tweet / sosyal medya gönderisi
 ```
+<!-- işaret-sözlüğü: bitir -->
 
 **Üretken görsel (AI) yok.** İLLÜSTRASYON işareti 2026-10-17'de kaldırıldı; yazma. Taşıyıcı metafor ya da soyut bir kavram için görsel gerekiyorsa `ANİM` (concept, compare, flow) kullan ya da o anı kamerada bırak. Eski script'lerde kalan İLLÜSTRASYON satırlarını pipeline atlar.
 

@@ -3,24 +3,9 @@
 
 export type VideoFormat = 'talking-head' | 'tutorial';
 
-export type MarkerKind =
-  | 'ANİM'
-  | 'EKRAN'
-  | 'HABER'
-  | 'BELGE'
-  | 'FOTO'
-  | 'POST';
-
-export type AnimType =
-  | 'flow'
-  | 'compare'
-  | 'table'
-  | 'timeline'
-  | 'stat'
-  | 'quote'
-  | 'terminal'
-  | 'code'
-  | 'concept';
+// İşaret türleri tek kaynaktan: marker-schema.ts (skill sözlüğü de oradan üretilir).
+import type {AnimType, MarkerKind} from './marker-schema';
+export type {AnimType, MarkerKind};
 
 export type LabeledText = {label?: string; text: string};
 

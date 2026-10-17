@@ -1,27 +1,16 @@
-// 📍 işaret grameri. Sözlük: .claude/skills/youtube-script-writer/SKILL.md → "Görsel İşaretler".
+// 📍 işaret grameri. Türlerin listesi src/shared/marker-schema.ts'te (skill'deki sözlük de oradan üretilir);
+// burada her türün içeriğinin nasıl ayrıştırıldığı var.
 
+import {ANIM_TYPES, KIND_ALIASES, MARKER_KINDS, RETIRED_MARKERS} from '../shared/marker-schema';
 import type {AnimType, LabeledText, MarkerKind, SceneProps} from '../shared/types';
 
 export const MARKER_LINE = /^\s*📍\s*\[(.*)\]\s*$/u;
 
-/** İLLÜSTRASYON (AI görseli) 2026-10-17'de kaldırıldı; eski script'lerdeki bu işaretler hata vermeden atlanır. */
-export const RETIRED_MARKER = /^\s*(İLLÜSTRASYON|ILLUSTRASYON|İLLUSTRASYON|ILLÜSTRASYON)\??\s*:/iu;
+/** Kaldırılan türler (ör. İLLÜSTRASYON, 2026-10-17); eski script'lerdeki bu işaretler hata vermeden atlanır. */
+export const RETIRED_MARKER = new RegExp(`^\\s*(${RETIRED_MARKERS.flatMap((r) => r.aliases).join('|')})\\??\\s*:`, 'iu');
 export const HAS_MARKER = /📍/u;
 
-const KINDS: Record<string, MarkerKind> = {
-  'ANİM': 'ANİM',
-  'EKRAN': 'EKRAN',
-  'HABER': 'HABER',
-  'BELGE': 'BELGE',
-  'FOTO': 'FOTO',
-  'POST': 'POST',
-};
-// Yazım hatası toleransı: kabul edilir ama lint uyarı verir.
-const KIND_ALIASES: Record<string, MarkerKind> = {
-  ANIM: 'ANİM',
-};
-
-const ANIM_TYPES: AnimType[] = ['flow', 'compare', 'table', 'timeline', 'stat', 'quote', 'terminal', 'code', 'concept'];
+const KINDS: Record<string, MarkerKind> = Object.fromEntries(MARKER_KINDS.map((k) => [k, k]));
 
 export type ParsedMarker = {
   kind: MarkerKind;

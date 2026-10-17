@@ -25,6 +25,7 @@
     "launcher": "bash scripts/make-launcher.sh",
     "timing": "tsx src/pipeline/cli.ts timing",
     "stats": "tsx src/pipeline/cli.ts stats",
+    "skill:sync": "tsx scripts/skill-sync.ts",
     "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
