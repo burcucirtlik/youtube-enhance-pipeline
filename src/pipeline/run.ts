@@ -9,6 +9,7 @@ import {loadCandidateSet, loadRegistry, writeReviewPage, type CandidateSet, type
 import {lintScript, type LintResult} from './lint';
 import {parseScript, type ParsedScript} from './parse-script';
 import {killTree, spawnTracked} from './procs';
+import type {WorkerEvent, WorkerJob} from './render-worker';
 import {codeHash, dirSig, fileHash, fileSig, forgetStage, hashOf, isFresh, loadState, recordStage, type StageKey} from './state';
 import {buildTiming, timingUpToDate} from './timing';
 import {ffprobe, findBaseMedia, fmtTime, paths, pickScript, ROOT, SKILL} from './util';
@@ -263,88 +264,139 @@ export const photoStatus = (dir: string, parsed: ParsedScript): PhotoStatus[] =>
 export type RenderOptions = {overlay?: boolean; includeSuggested?: boolean; frames?: string; force?: boolean; signal?: AbortSignal};
 
 /**
- * Render kendi süreç grubunda ve kendi geçici klasöründe çalışır (TMPDIR = build/.render-tmp-*).
- * Bitince, hata verince ya da iptal edilince: bütün süreç ağacı sonlandırılır, geçici klasör
- * (Remotion'un webpack paketi, Chrome profili, kare tamponları; tam videoda ~800 MB) silinir,
- * yarım kalan çıktı dosyası kaldırılır.
+ * Render kuyruğu: aynı anda tek render (her biri bütün çekirdekleri kullanıyor). Sıradaki işler bekler,
+ * iptal edilen sıradan düşer.
  */
+let renderChain: Promise<unknown> = Promise.resolve();
+let queued = 0;
+export const renderQueueLength = () => queued;
 
-export const stageRender = (dir: string, emit: Emit, opts: RenderOptions = {}): Promise<string> =>
-  new Promise((resolve, reject) => {
+const enqueue = <T,>(work: () => Promise<T>, onWait: (ahead: number) => void, signal?: AbortSignal): Promise<T> => {
+  const ahead = queued;
+  queued++;
+  if (ahead > 0) onWait(ahead);
+  const run = renderChain.then(() => {
+    if (signal?.aborted) throw new Error('Render iptal edildi');
+    return work();
+  });
+  renderChain = run.catch(() => {}).finally(() => queued--);
+  return run;
+};
+
+const parseFrames = (f?: string): [number, number] | undefined => {
+  if (!f) return undefined;
+  const m = f.match(/^(\d+)-(\d+)$/);
+  if (!m) throw new Error(`Kare aralığı "başlangıç-bitiş" olmalı: ${f}`);
+  return [Number(m[1]), Number(m[2])];
+};
+
+/**
+ * Render, Remotion'un Node API'siyle ayrı bir işçi süreçte (render-worker.ts) çalışır:
+ * - Remotion paketi kod değişmedikçe bir kez üretilir (.cache/remotion); her render'da yeniden paketlenmez,
+ *   proje klasörü (750 MB'lık video dahil) pakete kopyalanmaz, bağlanır.
+ * - İşçi kendi süreç grubunda ve kendi geçici klasöründe (TMPDIR = build/.render-tmp-*) çalışır. Bitince, hata
+ *   verince ya da iptal edilince süreç ağacı kapanır, geçici klasör silinir, yarım çıktı kaldırılır.
+ */
+export const stageRender = (dir: string, emit: Emit, opts: RenderOptions = {}): Promise<string> => {
+  const p = paths(dir);
+  if (!fs.existsSync(p.scenes)) return Promise.reject(new Error('build/scenes.json yok; önce hizalama çalışmalı'));
+  emit({type: 'stage', stage: 'render', status: 'start'});
+  fs.mkdirSync(p.out, {recursive: true});
+  const out = path.join(p.out, opts.overlay ? 'gorsel-katmani.mov' : 'video.mp4');
+  // Son tam render'dan beri hiçbir girdi değişmediyse aynı dosyayı yeniden üretme.
+  const key = renderKey(opts.overlay);
+  const hash = stageInputs.render(dir, opts);
+  if (!opts.frames && !opts.force && fs.existsSync(out) && isFresh(dir, key, hash)) {
+    emit({type: 'stage', stage: 'render', status: 'skip', detail: `değişmedi · ${path.basename(out)} güncel`});
+    return Promise.resolve(out);
+  }
+  const frames = parseFrames(opts.frames);
+  return enqueue(
+    () => runWorker(dir, emit, {out, overlay: Boolean(opts.overlay), includeSuggested: opts.includeSuggested ?? true, frames}, opts.signal),
+    (ahead) => emit({type: 'progress', stage: 'render', ratio: 0, text: `sırada: önünde ${ahead} render var`}),
+    opts.signal,
+  ).then(
+    (r) => {
+      // Kısmi (kare aralığı) render tam videonun yerine sayılmaz.
+      if (!frames) recordStage(dir, key, {hash, detail: r.detail, ok: true});
+      else forgetStage(dir, key);
+      emit({type: 'stage', stage: 'render', status: 'done', detail: r.detail});
+      return out;
+    },
+    (e: Error) => {
+      emit({type: 'stage', stage: 'render', status: 'error', detail: /iptal/i.test(e.message) ? 'iptal edildi' : e.message.split('\n')[0].slice(0, 200)});
+      throw e;
+    },
+  );
+};
+
+const runWorker = (dir: string, emit: Emit, job: Omit<WorkerJob, 'projectDir'>, signal?: AbortSignal) =>
+  new Promise<{detail: string}>((resolve, reject) => {
     const p = paths(dir);
-    if (!fs.existsSync(p.scenes)) return reject(new Error('build/scenes.json yok; önce hizalama çalışmalı'));
-    emit({type: 'stage', stage: 'render', status: 'start'});
-    fs.mkdirSync(p.out, {recursive: true});
-    const out = path.join(p.out, opts.overlay ? 'gorsel-katmani.mov' : 'video.mp4');
-    // Son tam render'dan beri hiçbir girdi değişmediyse aynı dosyayı yeniden üretme.
-    const key = renderKey(opts.overlay);
-    const hash = stageInputs.render(dir, opts);
-    if (!opts.frames && !opts.force && fs.existsSync(out) && isFresh(dir, key, hash)) {
-      emit({type: 'stage', stage: 'render', status: 'skip', detail: `değişmedi · ${path.basename(out)} güncel`});
-      return resolve(out);
-    }
-    const propsFile = path.join(p.build, 'render-props.json');
-    fs.writeFileSync(propsFile, JSON.stringify({scenesFile: 'build/scenes.json', includeSuggested: opts.includeSuggested ?? true, overlayOnly: Boolean(opts.overlay)}));
-    const args = ['remotion', 'render', 'src/remotion/index.ts', 'Video', out, '--public-dir', dir, '--props', propsFile, '--log=info'];
-    if (opts.overlay) args.push('--codec', 'prores', '--prores-profile', '4444', '--pixel-format', 'yuva444p10le', '--image-format', 'png');
-    if (opts.frames) args.push('--frames', opts.frames);
     const tmp = path.join(p.build, `.render-tmp-${Date.now()}`);
     fs.mkdirSync(tmp, {recursive: true});
     const startedAt = Date.now();
-    const child = spawnTracked(`render ${path.basename(dir)}`, 'npx', args, {cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: {...process.env, FORCE_COLOR: '0', TMPDIR: tmp + '/'}});
+    const spec: WorkerJob = {...job, projectDir: dir};
+    const child = spawnTracked(`render ${path.basename(dir)}`, process.execPath, ['--import', 'tsx', path.join(ROOT, 'src/pipeline/render-worker.ts'), JSON.stringify(spec)], {
+      cwd: ROOT,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {...process.env, FORCE_COLOR: '0', TMPDIR: tmp + '/'},
+    });
     let cancelled = false;
     const onAbort = () => {
       cancelled = true;
       emit({type: 'log', text: 'Render iptal ediliyor…'});
       if (child.pid) killTree(child.pid);
     };
-    opts.signal?.addEventListener('abort', onAbort, {once: true});
+    if (signal?.aborted) onAbort();
+    signal?.addEventListener('abort', onAbort, {once: true});
     const cleanup = (ok: boolean) => {
-      opts.signal?.removeEventListener('abort', onAbort);
+      signal?.removeEventListener('abort', onAbort);
       // Süreç ağacında artakalan (ör. Chrome yardımcıları) varsa onları da kapat.
       if (child.pid) killTree(child.pid, 1000);
       fs.rmSync(tmp, {recursive: true, force: true});
-      if (!ok && fs.existsSync(out) && fs.statSync(out).mtimeMs >= startedAt) fs.rmSync(out, {force: true});
+      if (!ok && fs.existsSync(job.out) && fs.statSync(job.out).mtimeMs >= startedAt) fs.rmSync(job.out, {force: true});
     };
     let buf = '';
-    let bundled = false;
-    const onChunk = (d: Buffer) => {
+    let stderr = '';
+    let done = false;
+    child.stdout!.on('data', (d: Buffer) => {
       buf += d.toString();
-      const parts = buf.split(/[\r\n]/);
-      buf = parts.pop() ?? '';
-      for (const raw of parts) {
-        const line = raw.replace(/\x1b\[[0-9;]*m/g, ''); // renk kodları günlükte görünmesin
-        const r = line.match(/Rendered\s+(\d+)\/(\d+)/);
-        const e = line.match(/Encoded\s+(\d+)\/(\d+)/);
-        if (r) {
-          bundled = true;
-          // Render %90, kodlama %10 olarak paylaştırılır.
-          emit({type: 'progress', stage: 'render', ratio: (Number(r[1]) / Number(r[2])) * 0.9, text: `kare ${r[1]} / ${r[2]}`});
-        } else if (e) emit({type: 'progress', stage: 'render', ratio: 0.9 + (Number(e[1]) / Number(e[2])) * 0.1, text: `kodlama ${e[1]} / ${e[2]}`});
-        else if (!bundled && /bundl|Bundling|compil/i.test(line)) emit({type: 'progress', stage: 'render', ratio: 0.02, text: 'paketleniyor'});
-        else if (line.trim() && !/^\s*[-+]\s/.test(line) && !/^\s*$/.test(line)) emit({type: 'log', text: line.trim().slice(0, 300)});
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';
+      for (const line of lines) {
+        let e: WorkerEvent;
+        try {
+          e = JSON.parse(line);
+        } catch {
+          if (line.trim()) emit({type: 'log', text: line.trim().slice(0, 300)});
+          continue;
+        }
+        if (e.t === 'bundle')
+          emit({type: 'progress', stage: 'render', ratio: e.status === 'paketleniyor' ? (e.ratio ?? 0) * 0.05 : 0.05, text: e.status === 'önbellekte' ? 'paket önbellekte' : e.status === 'paketleniyor' ? 'paketleniyor (kod değişti)' : 'paket hazır'});
+        else if (e.t === 'progress')
+          // Paket %5, kareler %85, kodlama %10.
+          emit({type: 'progress', stage: 'render', ratio: 0.05 + (e.rendered / e.total) * 0.85 + (e.encoded / e.total) * 0.1, text: e.rendered < e.total ? `kare ${e.rendered} / ${e.total}` : `kodlama ${e.encoded} / ${e.total}`});
+        else if (e.t === 'log') emit({type: 'log', text: e.text});
+        else if (e.t === 'done') done = true;
       }
-    };
-    child.stdout!.on('data', onChunk);
-    child.stderr!.on('data', onChunk);
+    });
+    child.stderr!.on('data', (d: Buffer) => {
+      stderr = (stderr + d.toString()).slice(-4000);
+    });
     child.on('error', (e) => {
       cleanup(false);
       reject(e);
     });
     child.on('close', (code) => {
-      if (cancelled || code !== 0 || !fs.existsSync(out)) {
+      if (cancelled || code !== 0 || !done || !fs.existsSync(job.out)) {
         cleanup(false);
-        emit({type: 'stage', stage: 'render', status: 'error', detail: cancelled ? 'iptal edildi' : `Remotion çıkış kodu ${code}`});
+        if (!cancelled && stderr.trim()) emit({type: 'log', text: stderr.trim().split('\n').slice(-6).join(' | ').slice(0, 600)});
         return reject(new Error(cancelled ? 'Render iptal edildi' : `Render başarısız (çıkış kodu ${code})`));
       }
       cleanup(true);
-      const mb = (fs.statSync(out).size / 1e6).toFixed(1);
-      const detail = `${path.basename(out)} · ${mb} MB · ${Math.round((Date.now() - startedAt) / 1000)} sn`;
-      // Kısmi (kare aralığı) render tam videonun yerine sayılmaz.
-      if (!opts.frames) recordStage(dir, key, {hash, detail, ok: true});
-      else forgetStage(dir, key);
-      emit({type: 'stage', stage: 'render', status: 'done', detail});
-      resolve(out);
+      const mb = (fs.statSync(job.out).size / 1e6).toFixed(1);
+      resolve({detail: `${path.basename(job.out)} · ${mb} MB · ${Math.round((Date.now() - startedAt) / 1000)} sn`});
     });
   });
 
