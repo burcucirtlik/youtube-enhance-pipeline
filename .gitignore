@@ -1,0 +1,20 @@
+# Bağımlılıklar ve derleme çıktıları
+node_modules/
+.venv/
+dist/
+.uploads/
+*.log
+.DS_Store
+.claude/settings.local.json
+
+# Videolar: medya ve yeniden üretilebilir ara dosyalar depoya girmez.
+# Girenler: script'ler, project.json, Descript altyazısı (zamanlama kaynağı),
+# editör düzenlemeleri (edits.json) ve fotoğraf lisans kayıtları (kaynaklar.json).
+videos/*/footage/*
+!videos/*/footage/*.srt
+!videos/*/footage/*.vtt
+videos/*/build/*
+!videos/*/build/edits.json
+videos/*/assets/*
+!videos/*/assets/kaynaklar.json
+videos/*/out/

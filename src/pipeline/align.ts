@@ -1,0 +1,313 @@
+// Script kelimelerini altyazıdan çıkan kelime zamanlarıyla hizalar, her 📍 işaretini zamanlı bir sahneye çevirir.
+
+import fs from 'node:fs';
+import path from 'node:path';
+import type {Chapter, Marker, Scene, SceneProps, ScenesFile} from '../shared/types';
+import type {ParsedScript} from './parse-script';
+import {levenshtein, normalizeWord} from './text';
+import {loadCandidateSet, loadRegistry, withCredit} from './commons';
+import {applyEdits, loadEdits} from './edits';
+import {assetKey, ffprobe, paths, rel, type Probe} from './util';
+
+export type Transcript = {duration: number; words: {w: string; start: number; end: number; p?: number}[]};
+
+// ── Kelime hizalama (Needleman–Wunsch, bulanık kelime eşleşmesi) ───────────
+
+const GAP = -1;
+
+const similarity = (a: string, b: string): number => {
+  if (a === b) return 3;
+  const min = Math.min(a.length, b.length);
+  if (min >= 4) {
+    let k = 0;
+    while (k < min && a[k] === b[k]) k++;
+    // Türkçe ekler: "kavanozları" ~ "kavanozlar"
+    if (k === min || k >= 5) return 2;
+  }
+  const max = Math.max(a.length, b.length);
+  if (max >= 3 && 1 - levenshtein(a, b) / max >= 0.75) return 1;
+  return -2;
+};
+
+/** Her script kelimesi için eşleşen transkript kelimesinin indeksi (yoksa -1). */
+export const alignWords = (script: string[], spoken: string[]): Int32Array => {
+  const n = script.length;
+  const m = spoken.length;
+  const ids = new Map<string, number>();
+  const intern = (w: string) => ids.get(w) ?? (ids.set(w, ids.size), ids.size - 1);
+  const A = script.map(intern);
+  const uA = ids.size;
+  const B = spoken.map(intern);
+  const U = ids.size;
+  const vocab = [...ids.keys()];
+  const cache = new Int8Array(uA * U).fill(127);
+  const sim = (a: number, b: number) => {
+    const k = a * U + b;
+    let v = cache[k];
+    if (v === 127) v = cache[k] = similarity(vocab[a], vocab[b]);
+    return v;
+  };
+
+  const tb = new Uint8Array((n + 1) * (m + 1)); // 0 köşegen, 1 yukarı (script kelimesi atlandı), 2 sol (transkript kelimesi atlandı)
+  let prev = new Int32Array(m + 1);
+  let cur = new Int32Array(m + 1);
+  for (let j = 0; j <= m; j++) {
+    prev[j] = j * GAP;
+    tb[j] = 2;
+  }
+  for (let i = 1; i <= n; i++) {
+    cur[0] = i * GAP;
+    tb[i * (m + 1)] = 1;
+    const ai = A[i - 1];
+    for (let j = 1; j <= m; j++) {
+      const d = prev[j - 1] + sim(ai, B[j - 1]);
+      const u = prev[j] + GAP;
+      const l = cur[j - 1] + GAP;
+      if (d >= u && d >= l) {
+        cur[j] = d;
+        tb[i * (m + 1) + j] = 0;
+      } else if (u >= l) {
+        cur[j] = u;
+        tb[i * (m + 1) + j] = 1;
+      } else {
+        cur[j] = l;
+        tb[i * (m + 1) + j] = 2;
+      }
+    }
+    [prev, cur] = [cur, prev];
+  }
+
+  const map = new Int32Array(n).fill(-1);
+  let i = n;
+  let j = m;
+  while (i > 0 && j > 0) {
+    const t = tb[i * (m + 1) + j];
+    if (t === 0) {
+      if (sim(A[i - 1], B[j - 1]) > 0) map[i - 1] = j - 1;
+      i--;
+      j--;
+    } else if (t === 1) i--;
+    else j--;
+  }
+  return map;
+};
+
+// ── Sahne zamanlaması ──────────────────────────────────────────────────────
+
+export type AlignOptions = {
+  includeSuggested: boolean;
+  minSceneSec: number;
+  maxSceneSec: number;
+  maxScreenSec: number;
+  tailSec: number;
+};
+
+export const DEFAULT_ALIGN: AlignOptions = {
+  includeSuggested: true, // scenes.json hepsini taşır; render bayrakla filtreler
+  minSceneSec: 2.5,
+  maxSceneSec: 9,
+  maxScreenSec: 25,
+  tailSec: 0.35,
+};
+
+type SentenceTime = {start: number; end: number; coverage: number} | null;
+
+export const sentenceTimes = (s: ParsedScript, t: Transcript): SentenceTime[] => {
+  const spoken = t.words.map((w) => normalizeWord(w.w));
+  // Boş normalize olan transkript kelimelerini (sadece noktalama) çıkar ama indeksleri koru.
+  const keep: number[] = [];
+  spoken.forEach((w, k) => w && keep.push(k));
+  const map = alignWords(s.words, keep.map((k) => spoken[k]));
+  return s.sentences.map((sen) => {
+    let first = -1;
+    let last = -1;
+    let matched = 0;
+    for (let w = sen.wordStart; w < sen.wordEnd; w++) {
+      const j = map[w];
+      if (j < 0) continue;
+      matched++;
+      if (first < 0) first = keep[j];
+      last = keep[j];
+    }
+    const total = sen.wordEnd - sen.wordStart;
+    const coverage = matched / total;
+    const needed = total <= 3 ? 1 : Math.max(2, Math.ceil(total * 0.34));
+    if (matched < needed) return null;
+    return {start: t.words[first].start, end: t.words[last].end, coverage};
+  });
+};
+
+const resolveAsset = (dir: string, props: SceneProps, probeCache: Map<string, Probe>): {props: SceneProps; missing?: string} => {
+  const p = paths(dir);
+  const inAssets = (f: string) => path.join(p.assets, f);
+  switch (props.type) {
+    case 'screen': {
+      const f = inAssets(props.file);
+      if (!fs.existsSync(f)) return {props, missing: `assets/${props.file}`};
+      if (!probeCache.has(f)) probeCache.set(f, ffprobe(f));
+      return {props: {...props, file: rel(dir, f), mediaDurationSec: probeCache.get(f)!.durationSec}};
+    }
+    case 'photo': {
+      const f = inAssets(props.file);
+      // Seçilmiş fotoğraf: atıf assets/kaynaklar.json'dan altyazıya eklenir.
+      if (fs.existsSync(f)) return {props: {...props, file: rel(dir, f), caption: withCredit(props.caption, loadRegistry(dir)[props.file])}};
+      // Henüz seçilmedi: önizlemede geçici olarak 1. aday.
+      const first = loadCandidateSet(dir, props.file)?.candidates[0];
+      if (first?.local) return {props: {...props, file: first.local, caption: withCredit(props.caption, first), provisional: true}};
+      return {props, missing: `assets/${props.file}${props.search ? ' (npm run assets ile aday ara)' : ''}`};
+    }
+    case 'code': {
+      const f = inAssets(props.file);
+      if (!fs.existsSync(f)) return {props, missing: `assets/${props.file}`};
+      return {props: {...props, code: fs.readFileSync(f, 'utf8'), language: path.extname(f).slice(1)}};
+    }
+    case 'news':
+    case 'document': {
+      const key = assetKey(props)!;
+      // Elle konan dosya (assets/) üretilene (build/assets/) üstün gelir.
+      for (const base of [p.assets, p.buildAssets]) {
+        for (const ext of ['.png', '.jpg', '.jpeg', '.webp']) {
+          const img = path.join(base, key + ext);
+          if (!fs.existsSync(img)) continue;
+          const metaFile = path.join(p.buildAssets, key + '.json');
+          const meta = fs.existsSync(metaFile) && base === p.buildAssets ? JSON.parse(fs.readFileSync(metaFile, 'utf8')) : {};
+          return {props: {...props, image: rel(dir, img), rects: meta.rects, imageSize: meta.width ? {width: meta.width, height: meta.height} : undefined} as SceneProps};
+        }
+      }
+      return {props, missing: `${key}.png (npm run assets)`};
+    }
+    default:
+      return {props};
+  }
+};
+
+export const buildScenes = (
+  dir: string,
+  scriptFile: string,
+  s: ParsedScript,
+  t: Transcript,
+  base: {file: string; kind: 'video' | 'audio'; probe: Probe},
+  opts: AlignOptions = DEFAULT_ALIGN,
+): ScenesFile => {
+  const times = sentenceTimes(s, t);
+  const warnings: string[] = [];
+  const dropped: ScenesFile['dropped'] = [];
+  const duration = base.probe.durationSec || t.duration;
+  const tutorial = s.header.format === 'tutorial';
+  const probeCache = new Map<string, Probe>();
+
+  const cutSentences = times.filter((x) => x === null).length;
+  if (cutSentences / Math.max(1, times.length) > 0.5)
+    warnings.push(`Cümlelerin %${Math.round((cutSentences / times.length) * 100)}'i kayıtta bulunamadı. Doğru kayıt mı? Kurgudan sonra script.final.md üretmek hizalamayı düzeltir.`);
+
+  // Birden fazla aday seçilmiş FOTO işaretleri ayrı sahnelere açılır (aynı cümlenin süresi bölünür).
+  const registry = loadRegistry(dir);
+  const markers: Marker[] = s.markers.flatMap((m) => {
+    const pr = m.props;
+    if (pr.type !== 'photo') return [m];
+    const extra = registry[pr.file]?.extra ?? [];
+    return [m, ...extra.map((file, i): Marker => ({...m, id: `${m.id}#${i + 2}`, props: {...pr, file}}))];
+  });
+
+  // İşaretleri cümlelerine göre grupla.
+  const bySentence = new Map<number, Marker[]>();
+  for (const m of markers) {
+    if (!opts.includeSuggested && m.suggested) continue;
+    if (m.sentenceIndex < 0) {
+      dropped.push({markerId: m.id, line: m.line, raw: m.raw, reason: 'bir cümleye bağlanamadı'});
+      continue;
+    }
+    if (!times[m.sentenceIndex]) {
+      dropped.push({markerId: m.id, line: m.line, raw: m.raw, reason: `desteklediği cümle kayıtta yok (kurguda kesilmiş olabilir): "${s.sentences[m.sentenceIndex].text.slice(0, 80)}"`});
+      continue;
+    }
+    const arr = bySentence.get(m.sentenceIndex) ?? [];
+    arr.push(m);
+    bySentence.set(m.sentenceIndex, arr);
+  }
+
+  const scenes: Scene[] = [];
+  // Kısa bir cümlenin altındaki işaretler en kısa sürelerini doldurmak için sonraki cümleye taşabilir;
+  // o zaman sonraki cümlenin sahneleri onların arasına girmesin, ardından gelsin.
+  let cursor = 0;
+  for (const [si, ms] of [...bySentence.entries()].sort((a, b) => a[0] - b[0])) {
+    const st = times[si]!;
+    const span = Math.max(st.end - st.start, opts.minSceneSec * ms.length);
+    const slot = span / ms.length;
+    const groupStart = Math.max(st.start, cursor);
+    if (groupStart - st.start > 2) warnings.push(`Satır ${ms[0].line}: önceki işaretler taştığı için sahne cümlesinden ${(groupStart - st.start).toFixed(1)} sn geç giriyor`);
+    cursor = groupStart + span;
+    ms.forEach((m, k) => {
+      const {props, missing} = resolveAsset(dir, m.props, probeCache);
+      const start = groupStart + k * slot;
+      let end = start + slot + (k === ms.length - 1 ? opts.tailSec : 0);
+      if (props.type === 'screen' && props.mediaDurationSec) end = Math.max(end, start + Math.min(props.mediaDurationSec, opts.maxScreenSec));
+      else end = Math.min(Math.max(end, start + opts.minSceneSec), start + opts.maxSceneSec);
+      if (missing) warnings.push(`Satır ${m.line}: varlık eksik → ${missing} (yer tutucu çizilecek)`);
+      if (props.type === 'photo' && props.provisional) warnings.push(`Satır ${m.line}: ${m.props.type === 'photo' ? m.props.file : ''} henüz seçilmedi, geçici olarak 1. aday kullanılıyor (build/fotolar/index.html)`);
+      scenes.push({
+        id: `s${String(scenes.length + 1).padStart(3, '0')}`,
+        markerId: m.id,
+        line: m.line,
+        kind: m.kind,
+        suggested: m.suggested,
+        danger: m.danger,
+        startSec: start,
+        endSec: end,
+        anchorText: s.sentences[si].text,
+        props,
+        missingAsset: missing,
+      });
+    });
+  }
+
+  // Çakışmaları çöz: bir sahne bir sonrakinin başladığı yerde biter.
+  scenes.sort((a, b) => a.startSec - b.startSec);
+  for (let k = 0; k < scenes.length; k++) {
+    const next = scenes[k + 1];
+    const sc = scenes[k];
+    if (tutorial) sc.endSec = next ? next.startSec : duration; // yüz yok: boşluk bırakma
+    else if (next && sc.endSec > next.startSec - 0.05) sc.endSec = Math.max(sc.startSec + 0.5, next.startSec - 0.05);
+    sc.endSec = Math.min(sc.endSec, duration);
+    if (sc.endSec - sc.startSec < 1.2) warnings.push(`Satır ${sc.line}: sahne ${(sc.endSec - sc.startSec).toFixed(1)} sn'ye sıkıştı (işaretler çok yakın)`);
+  }
+  if (tutorial && scenes[0] && scenes[0].startSec < 12) scenes[0].startSec = 0;
+
+  // YouTube bölüm işaretleri: ## başlıklarının gerçekte başladığı an.
+  const chapters: Chapter[] = [];
+  for (const sec of s.sections) {
+    for (let si = sec.firstSentence; si < s.sentences.length && s.sentences[si].section === sec.title; si++) {
+      if (times[si]) {
+        chapters.push({title: sec.title, startSec: times[si]!.start});
+        break;
+      }
+    }
+  }
+  if (chapters[0]) chapters[0].startSec = 0;
+
+  const result: ScenesFile = {
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    title: s.header.title,
+    format: s.header.format,
+    scriptFile: rel(dir, scriptFile),
+    base: {
+      kind: base.kind,
+      src: rel(dir, base.file),
+      durationSec: duration,
+      width: base.kind === 'video' ? base.probe.width : 1920,
+      height: base.kind === 'video' ? base.probe.height : 1080,
+      fps: base.kind === 'video' ? base.probe.fps : 30,
+    },
+    chapters,
+    scenes,
+    dropped,
+    warnings,
+  };
+  // Editör düzenlemeleri (kaydırma, kısaltma, silme) ham hizalamanın üstüne biner.
+  const edits = loadEdits(dir);
+  const applied = applyEdits(result, edits);
+  const editedCount = applied.scenes.filter((x) => x.edited || x.disabled).length;
+  if (editedCount) warnings.push(`${editedCount} sahnede editör düzenlemesi uygulandı (build/edits.json)`);
+  return {...applied, aligned: result.scenes};
+};
