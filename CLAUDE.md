@@ -73,6 +73,7 @@ Zena bir şeyi beğenmediğinde ya da yeni bir tercih söylediğinde:
 
 ## Açık sorular / fikirler
 
+- **Yapay Zekaya Hakaret-2 düzenlemeleri:** 44 düzenlemenin 37'si sahneyi > 10 sn taşıyor, çoğu bir-iki önceki sahnenin hizalanmış zamanıyla birebir aynı (kimlik kayması izi). Zena bunları kendisi mi yaptı? Değilse editörde **Düzenlemeleri sıfırla**; sonra `npm run stats`.
 - **Commons dışı arşivler:** Library of Congress ve NARA'nın kendi API'leri de aranabilir; Commons'ta olmayan fotoğraflar için (ör. Ruanda etnik kimlik kartı).
 - Ruanda etnik kimlik kartının serbest lisanslı fotoğrafı Commons'ta yok; başka kaynak ya da kodla çizilmiş bir kart gerekebilir.
 
