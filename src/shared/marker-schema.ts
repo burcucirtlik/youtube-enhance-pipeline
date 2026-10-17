@@ -1,7 +1,7 @@
 // 📍 işaret sözlüğünün tek kaynağı. Buradan türeyenler:
 // - parser'ın tanıdığı türler (src/pipeline/markers.ts) ve TypeScript türleri (src/shared/types.ts)
 // - arayüzdeki tür etiketleri (ui/src/api.ts)
-// - skill'deki "İşaret sözlüğü" bloğu (SKILL.md; `npm run skill:sync` yazar, test eşitliği denetler)
+// - gorsel-isaretleme skill'indeki "İşaret sözlüğü" bloğu (SKILL.md; `npm run skill:sync` yazar, test eşitliği denetler)
 // Yeni bir tür eklemek: buraya ekle, parser'a ayrıştırmasını, Remotion'a sahnesini yaz, `npm run skill:sync`.
 
 export const ANIM_MARKERS = [

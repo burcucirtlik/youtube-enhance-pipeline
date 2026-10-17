@@ -9,9 +9,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type {Scene, ScenesFile} from '../shared/types';
 import {loadEdits, type Edits} from './edits';
-import {paths, SKILL, VIDEOS} from './util';
+import {MARKING_SKILL, paths, VIDEOS} from './util';
 
-export const FEEDBACK_FILE = path.join(path.dirname(SKILL), 'editor-istatistikleri.md');
+export const FEEDBACK_FILE = path.join(path.dirname(MARKING_SKILL), 'editor-istatistikleri.md');
 
 export type Outcome = 'tutuldu' | 'kaydırıldı' | 'taşındı' | 'süresi değişti' | 'silindi';
 export type SceneOutcome = {project: string; key: string; suggested: boolean; outcome: Outcome; shiftSec: number; durationDelta: number};

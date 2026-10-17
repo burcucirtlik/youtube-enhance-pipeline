@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {describe, it} from 'node:test';
 import {MARKER_LINE, parseMarker} from '../src/pipeline/markers';
-import {SKILL} from '../src/pipeline/util';
+import {MARKING_SKILL} from '../src/pipeline/util';
 import {ANIM_MARKERS, REAL_MARKERS, SKILL_BLOCK_END, SKILL_BLOCK_START, skillDictionary, TYPE_LABEL} from '../src/shared/marker-schema';
 
 const inner = (line: string) => line.match(MARKER_LINE)![1];
@@ -23,8 +23,9 @@ describe('işaret sözlüğü (tek kaynak)', () => {
       }
   });
 
-  it("SKILL.md'deki sözlük bloğu şemadan üretilenle aynı (değilse: npm run skill:sync)", () => {
-    const skill = fs.readFileSync(SKILL, 'utf8');
+  // Skill kişisel skill deposunda (~/.claude/skills); kurulu değilse bu denetim atlanır.
+  it("gorsel-isaretleme skill'indeki sözlük bloğu şemadan üretilenle aynı (değilse: npm run skill:sync)", {skip: !fs.existsSync(MARKING_SKILL) && 'skill kurulu değil'}, () => {
+    const skill = fs.readFileSync(MARKING_SKILL, 'utf8');
     const a = skill.indexOf(SKILL_BLOCK_START);
     const b = skill.indexOf(SKILL_BLOCK_END);
     assert.ok(a >= 0 && b > a, 'blok işaretleri var');

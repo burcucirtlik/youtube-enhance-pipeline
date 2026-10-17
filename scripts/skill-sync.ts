@@ -1,10 +1,10 @@
-// SKILL.md'deki işaret sözlüğü bloğunu src/shared/marker-schema.ts'ten yeniden yazar.
+// gorsel-isaretleme skill'inin SKILL.md'sindeki işaret sözlüğü bloğunu src/shared/marker-schema.ts'ten yeniden yazar.
 // Blok işaretleri yoksa (ilk çalıştırma), "Animasyonlar" ile "Gerçek görseller" kod bloklarını bulup yerine koyar.
 // Kullanım: npm run skill:sync  (değişiklik yoksa dosyaya dokunmaz)
 
 import fs from 'node:fs';
 import {replaceSkillDictionary, SKILL_BLOCK_START, skillDictionary} from '../src/shared/marker-schema';
-import {SKILL} from '../src/pipeline/util';
+import {MARKING_SKILL as SKILL} from '../src/pipeline/util';
 
 let text = fs.readFileSync(SKILL, 'utf8');
 if (!text.includes(SKILL_BLOCK_START)) {

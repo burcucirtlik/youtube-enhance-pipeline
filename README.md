@@ -1,14 +1,19 @@
 # YouTube Enhance — Video Pipeline
 
-`youtube-script-writer` skill'inin yazdığı `script.md` içindeki **📍 işaretlerini** kurgu kaydındaki doğru saniyeye hizalar, her işareti bileşen kütüphanesindeki bir sahneye çevirir ve Remotion ile videonun üstüne yerleştirir.
+Kurgusu biten videonun işaretli metnindeki (`script.final.md`) **📍 işaretlerini** kurgu kaydındaki doğru saniyeye hizalar, her işareti bileşen kütüphanesindeki bir sahneye çevirir ve Remotion ile videonun üstüne yerleştirir.
 
 ```
-script.md + kurgu.srt ──► lint ──► zamanlama (SRT) ──► assets ──► align ──► scenes.json ──► Remotion studio / render
+script.final.md + kurgu.srt ──► lint ──► zamanlama (SRT) ──► assets ──► align ──► scenes.json ──► Remotion studio / render
                                                   │
               haber ekran görüntüsü + fosforlu kalem, PDF sayfası + vurgu, arşiv fotoğrafı adayları, eksik listesi
 ```
 
 Zena'nın tercihleri ve pipeline'da alınan kararlar [CLAUDE.md](CLAUDE.md) içindeki karar günlüğünde tutulur.
+
+**Skill'ler** ayrı, gizli bir depoda: [my-skillset](https://github.com/burcucirtlik/my-skillset), bu Mac'te `~/.claude/skills`.
+- `youtube-script-writer` çekimden önce script'i yazar (yalnızca konuşulacak metin + sonda "Görsel Fikirleri").
+- `gorsel-isaretleme` kurgudan sonra Descript altyazısından (SRT) işaretli `script.final.md`'yi üretir; pipeline bunu okur.
+Pipeline skill'leri `~/.claude/skills`'ten bulur (`YTE_SKILLS` ile değiştirilebilir): lint yazım skill'inin tükenmiş ifade listelerini okur; `npm run skill:sync` ve `npm run stats` işaretleme skill'ine yazar.
 
 ## Masaüstü uygulaması
 
@@ -71,17 +76,17 @@ Masaüstü ikonu ve uygulama bunu kendisi yapar.
 
    Teknik eğitim için sona `--egitim` ekle.
 
-2. **Script'i koy.** Skill'in ürettiği `script.md`'yi `videos/2026-10-kisa-baslik/` içine kopyala, sonra kontrol et:
+2. **Script'i koy.** `youtube-script-writer`'ın yazdığı `script.md`'yi `videos/2026-10-kisa-baslik/` içine kopyala (çekim script'i; işaret içermez).
+
+3. **Malzemeyi topla.** Ekran kayıtlarını, fotoğrafları, PDF'leri ve kod dosyalarını script'teki adlarla `assets/` içine koy. Descript'ten dışa aktardığın kurguyu `footage/kurgu.mp4`, altyazısını (Export → Subtitles → SRT) `footage/kurgu.srt` olarak kaydet. **Altyazı zorunlu:** görsellerin saniyesi yalnızca buradan hesaplanır. Teknik eğitimde buraya seslendirme (`.wav` ya da `.m4a`) gelir.
+
+4. **Kurgudan sonra işaretle:** Descript altyazısını (ve varsa `script.md`'yi) `gorsel-isaretleme` skill'ine ver; ürettiği `script.final.md`'yi aynı klasöre koy ve kontrol et:
 
    ```bash
    npm run lint -- 2026-10-kisa-baslik
    ```
 
-   Lint, işaret sözlüğünü ve skill'in "İç Kalite Kontrol" listesinin makineyle denetlenebilen kısmını kontrol eder: yazım, yoğunluk, art arda tam ekran, tehlike oranı, kaynak tablosu, yasaklı kalıplar, tükenmiş ifadeler, imzalar.
-
-3. **Malzemeyi topla.** Ekran kayıtlarını, fotoğrafları, PDF'leri ve kod dosyalarını script'teki adlarla `assets/` içine koy. Descript'ten dışa aktardığın kurguyu `footage/kurgu.mp4`, altyazısını (Export → Subtitles → SRT) `footage/kurgu.srt` olarak kaydet. **Altyazı zorunlu:** görsellerin saniyesi yalnızca buradan hesaplanır. Teknik eğitimde buraya seslendirme (`.wav` ya da `.m4a`) gelir.
-
-4. **Kurgudan sonra (önerilir):** Descript transkriptini skill'e verip `script.final.md` üret ve aynı klasöre koy. Pipeline varsa onu kullanır, böylece işaretler gerçekte söylenen cümlelere oturur.
+   Lint işaret sözlüğünü ve skill'lerin kalite listesinin makineyle denetlenebilen kısmını kontrol eder: yazım, yoğunluk, art arda tam ekran, tehlike oranı, kaynak tablosu, yasaklı kalıplar, tükenmiş ifadeler, imzalar. İşaretler doğrudan söylenen metne konduğu için hizalama kelimesi kelimesine eşleşir. Pipeline `script.final.md` varsa onu kullanır.
 
 5. **Çalıştır**
 
@@ -90,7 +95,7 @@ Masaüstü ikonu ve uygulama bunu kendisi yapar.
    ```
 
    Bu komut sırayla lint → zamanlama → assets → align adımlarını çalıştırır. Çıktılar:
-   - `build/scenes.json`: zamanlanmış sahneler (pipeline'ın son hali; skill'in öğrenme döngüsüne de girdi olur)
+   - `build/scenes.json`: zamanlanmış sahneler (pipeline'ın son hali; editör istatistikleri buradan çıkar)
    - `build/rapor.md`: lint sonuçları, varlık kontrol listesi, düşen işaretler, sahne listesi
    - `out/bolumler.txt`: YouTube bölüm işaretleri (`##` başlıklarının gerçek başlama anları)
 
@@ -173,7 +178,6 @@ Eksik bir varlık render'ı durdurmaz: o sahne "EKSİK GÖRSEL" yer tutucusuyla 
 ## Klasör yapısı
 
 ```
-.claude/skills/youtube-script-writer/   skill (script yazımı, görsel işaret sözlüğü, kurgu sonrası mod)
 brand/brand.ts                          görsel kimlik
 src/pipeline/                           parser, lint, hizalama, varlık toplama, CLI
 src/remotion/                           sahne kütüphanesi ve kompozisyonlar

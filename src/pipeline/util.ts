@@ -1,13 +1,28 @@
 import {execFileSync} from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type {SceneProps} from '../shared/types';
 
 export const ROOT = path.resolve(import.meta.dirname, '../..');
 // YTE_VIDEOS: projeler başka bir klasörden okunsun (testler ve deneme sunucusu kullanıcının projelerine dokunmasın).
 export const VIDEOS = process.env.YTE_VIDEOS ? path.resolve(process.env.YTE_VIDEOS) : path.join(ROOT, 'videos');
-export const SKILL = path.join(ROOT, '.claude/skills/youtube-script-writer/SKILL.md');
+/**
+ * Skill'ler kişisel skill deposunda (github.com/burcucirtlik/my-skillset), Claude Code'un kullanıcı klasörü
+ * ~/.claude/skills olarak. YTE_SKILLS ile başka bir klasör verilebilir; proje içinde .claude/skills varsa o önce gelir.
+ */
+const skillsDir = (): string => {
+  if (process.env.YTE_SKILLS) return path.resolve(process.env.YTE_SKILLS);
+  const local = path.join(ROOT, '.claude/skills');
+  if (fs.existsSync(path.join(local, 'youtube-script-writer'))) return local;
+  return path.join(os.homedir(), '.claude/skills');
+};
+export const SKILLS_DIR = skillsDir();
+/** Script yazım skill'i: lint "daha önce kullanılan" ifade listelerini buradan okur. */
+export const SKILL = path.join(SKILLS_DIR, 'youtube-script-writer/SKILL.md');
+/** Görsel işaretleme skill'i: işaret sözlüğü bloğu (npm run skill:sync) ve editör istatistikleri buraya yazılır. */
+export const MARKING_SKILL = path.join(SKILLS_DIR, 'gorsel-isaretleme/SKILL.md');
 export const PY = path.join(ROOT, '.venv/bin/python');
 
 // Apple Silicon'da Node Rosetta (x86_64) altında çalışıyorsa, alt süreçler de x86_64 açılır ve
