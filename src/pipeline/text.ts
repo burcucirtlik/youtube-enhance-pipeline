@@ -36,7 +36,8 @@ export const tokenize = (s: string): string[] =>
 /** Paragrafı cümlelere böler. "..." ve "…" ile asılı kalan cümleler ayrı cümle sayılır. */
 export const splitSentences = (paragraph: string): string[] => {
   const out: string[] = [];
-  const re = /[^.!?…]+(?:[.!?…]+["'”’)]*|$)/g;
+  // Rakam arasındaki nokta cümle sonu değildir: "Opus 4.7", "1.200 ajan", "2.5 saat".
+  const re = /(?:[^.!?…]|(?<=\d)\.(?=\d))+(?:[.!?…]+["'”’)]*|$)/g;
   for (const m of paragraph.matchAll(re)) {
     const t = m[0].trim();
     if (t && /[\p{L}\p{N}]/u.test(t)) out.push(t);

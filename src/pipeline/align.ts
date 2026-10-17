@@ -313,6 +313,8 @@ export const buildScenes = (
       let [minSec, maxSec] = DURATION[props.type] ?? [opts.minSceneSec, opts.maxSceneSec];
       // Sohbet okunacak kadar kalır (saniyede ~3 kelime).
       if (props.type === 'chat') minSec = Math.max(minSec, Math.min(maxSec, props.turns.join(' ').split(/\s+/).length / 3));
+      // Sistem diyagramı: aktörler girer, her olay ~1,6 sn'de izlenebilsin (kısa cümlede 4 olay 3 sn'ye sıkışıyordu).
+      if (props.type === 'system') minSec = Math.max(minSec, Math.min(maxSec, 1.2 + 1.6 * props.events.length));
       // Liste: her madde kendi kelimesinde gelir (sonraki cümlelerde de olabilir); sahne son maddeden 3 sn sonra biter.
       if (props.type === 'list') {
         let last = 0;

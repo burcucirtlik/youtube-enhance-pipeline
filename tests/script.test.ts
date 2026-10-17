@@ -29,6 +29,14 @@ describe('script okuyucu', () => {
     assert.ok(s.issues.some((i) => /İLLÜSTRASYON/.test(i.msg) && i.level === 'bilgi'));
   });
 
+  it('rakam arasındaki nokta cümleyi bölmez ("Opus 4.7", "1.200")', () => {
+    const s = parseScript(miniScript('## A\n\nİşte Opus 4.7 ve Mythos 5. Fiyat 1.200 lira oldu.'));
+    assert.deepEqual(
+      s.sentences.map((x) => x.text),
+      ['İşte Opus 4.7 ve Mythos 5.', 'Fiyat 1.200 lira oldu.', 'Bir sonraki videoda görüşmek üzere.'],
+    );
+  });
+
   it('cümle ortasındaki işaret hata verir', () => {
     const s = parseScript(miniScript('## A\n\nBir cümle 📍 [ANİM: stat — "1"] devam.'));
     assert.ok(s.issues.some((i) => i.level === 'hata'));
