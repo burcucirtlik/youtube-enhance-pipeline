@@ -77,6 +77,21 @@ describe('hizalama', () => {
     assert.equal(times[1], null, 'kesilen cümle düştü');
   });
 
+  it('başka videonun altyazısı: sessizce 0 sahne değil, açık hata', async () => {
+    const {buildScenes} = await import('../src/pipeline/align');
+    const s = parseScript(fixture('hakaret', 'script.final.md'));
+    const t = transcriptFromCues([{start: 0, end: 5, text: 'Önce nezarethaneye kapatıldılar.'}, {start: 5, end: 9, text: 'İçeride birbirlerini bulup organize oldular.'}]);
+    const p = tempProject();
+    try {
+      assert.throws(
+        () => buildScenes(p.dir, p.dir + '/s.md', s, t, {file: p.dir + '/x.mp4', kind: 'video', probe: {durationSec: 900, width: 1280, height: 720, fps: 30, hasVideo: true}}),
+        /Altyazı bu script'e ait görünmüyor[\s\S]*Altyazı şöyle başlıyor: "Önce nezarethaneye[\s\S]*Altyazının uzunluğu 0:09, videonunki 15:00/,
+      );
+    } finally {
+      p.cleanup();
+    }
+  });
+
   it('Türkçe ek farklarını tolere eder', () => {
     const n = (a: string[]) => a.map(normalizeWord);
     const map = alignWords(n(['kavanozları', 'gördüm']), n(['kavanozlar', 'GÖRDÜM']));

@@ -261,8 +261,28 @@ export const buildScenes = (
   const probeCache = new Map<string, Probe>();
 
   const cutSentences = times.filter((x) => x === null).length;
-  if (cutSentences / Math.max(1, times.length) > 0.5)
-    warnings.push(`Cümlelerin %${Math.round((cutSentences / times.length) * 100)}'i kayıtta bulunamadı. Doğru kayıt mı? Kurgudan sonra script.final.md üretmek hizalamayı düzeltir.`);
+  const cutRatio = cutSentences / Math.max(1, times.length);
+  const fmt = (x: number) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
+  const subEnd = t.words.at(-1)?.end ?? 0;
+  const lengthNote = Math.abs(subEnd - duration) > Math.max(15, duration * 0.05) ? `Altyazının uzunluğu ${fmt(subEnd)}, videonunki ${fmt(duration)}.` : '';
+  // Yanlış altyazı (başka videonunki) ya da yanlış script: hizalama sessizce 0 sahne üretmesin, ne olduğunu söylesin.
+  if (cutRatio > 0.8 && s.sentences.length >= 5) {
+    const head = (words: string[]) => words.slice(0, 9).join(' ');
+    throw new Error(
+      [
+        `Altyazı bu script'e ait görünmüyor: script cümlelerinin %${Math.round(cutRatio * 100)}'i altyazıda yok.`,
+        `Script şöyle başlıyor: "${s.sentences[0].text.slice(0, 70)}…"`,
+        `Altyazı şöyle başlıyor: "${head(t.words.map((w) => w.w))}…"`,
+        lengthNote,
+        'Başka bir videonun SRT\'si yüklenmiş olabilir; doğrusunu "Altyazıyı değiştir" ile yükle.',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    );
+  }
+  if (cutRatio > 0.5)
+    warnings.push(`Cümlelerin %${Math.round(cutRatio * 100)}'i kayıtta bulunamadı. Doğru kayıt mı? Kurgudan sonra script.final.md üretmek hizalamayı düzeltir.`);
+  if (lengthNote) warnings.push(`${lengthNote} Altyazı bu videonun mu?`);
 
   // Birden fazla aday seçilmiş FOTO işaretleri ayrı sahnelere açılır (aynı cümlenin süresi bölünür).
   const registry = loadRegistry(dir);

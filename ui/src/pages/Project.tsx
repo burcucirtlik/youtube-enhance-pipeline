@@ -149,6 +149,12 @@ export const Project: React.FC<{id: string}> = ({id}) => {
             Pipeline'ı yeniden çalıştır
           </button>
         ) : null}
+        {d.hasSubtitles ? (
+          <label className="button small" title="Yanlış ya da eski altyazı yüklendiyse Descript'ten aldığın doğru SRT'yi yükle; hazırlık yeniden çalışır" style={{cursor: running || uploading ? 'default' : 'pointer', opacity: running || uploading ? 0.5 : 1}}>
+            Altyazıyı değiştir
+            <input type="file" accept=".srt,.vtt" style={{display: 'none'}} disabled={running || uploading} onChange={(e) => upload('subtitles', e.target.files?.[0])} />
+          </label>
+        ) : null}
         <button className="small" onClick={cleanup} disabled={running} title="Yeniden üretilebilir dosyaları (aday fotoğraflar, görsel katmanı, yarım render) siler">
           Temizle{d.disk?.reclaimable ? ` (${fmtBytes(d.disk.reclaimable)})` : ''}
         </button>

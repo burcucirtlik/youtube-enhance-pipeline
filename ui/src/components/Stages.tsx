@@ -65,7 +65,7 @@ export const Stages: React.FC<{stages: {name: StageName; label: string}[]; event
             </div>
           );
         })}
-        {error ? <div className="err" style={{padding: 10}}>{error}</div> : null}
+        {error ? <div className="err" style={{padding: 10, whiteSpace: 'pre-line'}}>{error}</div> : null}
         {!running && !error && events.length ? <div className="ok" style={{padding: 10}}>Tamamlandı.</div> : null}
       </div>
       <div className="log mono" ref={logRef}>
