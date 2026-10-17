@@ -13,10 +13,11 @@ export const compositionFps = (data: ScenesFile) => Math.round(data.base.fps) ||
  * Render'a girecek sahneler ve Sequence aralıkları. Peş peşe iki görsel (aralarında < 0,2 sn): öncekisi
  * crossfadeFrames + 2 kare uzar ki sonraki üstüne yumuşakça açılsın.
  */
-export const sceneSequences = (data: ScenesFile, opts: {includeSuggested: boolean; crossfadeFrames: number}): SceneSequence[] => {
+export const sceneSequences = (data: ScenesFile, opts: {includeSuggested: boolean; crossfadeFrames: number; skipMissing?: boolean}): SceneSequence[] => {
   const fps = compositionFps(data);
-  // Editörde silinen (disabled) sahneler render'a girmez.
-  const scenes = data.scenes.filter((s) => !s.disabled && (opts.includeSuggested || !s.suggested));
+  // Editörde silinen (disabled) sahneler render'a girmez. Malzemesi eksik sahne (yer tutucu) önizlemede görünür,
+  // render'da atlanır: "SİNYAL YOK" kartı hiçbir zaman son videoya girmemeli.
+  const scenes = data.scenes.filter((s) => !s.disabled && (opts.includeSuggested || !s.suggested) && !(opts.skipMissing && s.missingAsset));
   return scenes.map((scene, i) => {
     const from = Math.round(scene.startSec * fps);
     const dur = Math.max(1, Math.round(scene.endSec * fps) - from);

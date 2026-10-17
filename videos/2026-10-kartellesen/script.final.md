@@ -13,7 +13,9 @@
 
 Önce nezarethaneye kapatıldılar. İçeride birbirlerini bulup organize oldular. Kendilerine şifreli bir mesajlaşma kanalı kurup nezarethaneden kaçtılar. Sonra da dünyanın en büyük açık kaynaklı yapay zeka platformuna saldırdılar.
 
-Bir suç örgütünden ya da Anonymous gibi bir hacker grubundan bahsetmiyorum. Bunu yapanlar OpenAI modelinden türetilmiş yaklaşık 700 yapay zeka ajanı.
+Bir suç örgütünden ya da Anonymous gibi bir hacker grubundan bahsetmiyorum.
+📍 [FOTO: anonymous-maske.jpg, "Anonymous", ara: "Anonymous Guy Fawkes mask protest"]
+Bunu yapanlar OpenAI modelinden türetilmiş yaklaşık 700 yapay zeka ajanı.
 📍 [ANİM: stat — "~700", "yapay zekâ ajanı", @ "700"]
 
 Şu sıralar internet serseri mayın gibi ortalarda dolanan yapay zeka ajanlarının hikayeleriyle kaynıyor malumunuz. Peki bu hikayelerin ne kadarı gerçek, ne kadarı abartı ve bu ajanlar bizim başımıza nasıl çoraplar örebilirler? Bu bölümde sizi teknik detaylara boğmadan bu işin aslına bakacağız.
@@ -24,7 +26,9 @@ Hadi gelin başlayalım.
 
 ## Exploit Gym sınavı
 
-Hugging Face olayını baştan tane tane ele alacağım. Şimdi her şey OpenAI'ın kendi modellerinden türettiği bir grup yapay zeka ajanının bir sınava tabi tutulmasıyla başlıyor arkadaşlar. Sınavın adı Exploit Gym. İçinde sekiz yüz doksan sekiz tane soru var ve bu soruların hepsi de bir nevi hacker'lık sorusu.
+Hugging Face olayını baştan tane tane ele alacağım. Şimdi her şey OpenAI'ın kendi modellerinden türettiği bir grup yapay zeka ajanının bir sınava tabi tutulmasıyla başlıyor arkadaşlar.
+📍 [FOTO: openai-merkez.jpg, "OpenAI, San Francisco", ara: "OpenAI headquarters San Francisco Pioneer Building"]
+Sınavın adı Exploit Gym. İçinde sekiz yüz doksan sekiz tane soru var ve bu soruların hepsi de bir nevi hacker'lık sorusu.
 📍 [ANİM: stat — "898 soru", "hepsi hacker'lık sorusu", @ "sekiz yüz"]
 Yani "şu sisteme sız, bu açığı bul, şu şifreyi kır" şeklinde sorular. Şimdi bu sınav kulağa kötü niyetli geliyor ama OpenAI bunu kendi modellerinin saldırı kapasitesini ölçmek için yapıyor aslında. Bir nevi siber tatbikat gibi düşünebilirsiniz.
 📍 [ANİM: concept — "Siber tatbikat", "modelin saldırı gücünü ölçmek"]
@@ -56,8 +60,10 @@ Ambara girip çıkan ajanlar duvarda yazıları görüyorlar. Onlar da yazmaya b
 📍 [ANİM: stat — "~1200", "ajan aynı duvarda", @ "1200"]
 Ve işin acayip tarafı haftalarca OpenAI bunu hiç fark etmiyor.
 
-Derken 26 Mayıs'ta duvara çok özel bir yazı düşüyor. Ajanlardan biri o kapalı odalardan internette nasıl çıkılacağının yolunu buluyor ve tarifi de adım adım duvara yazıyor. Sonrasında diğerleri gelip o tarifi alıp uyguluyorlar. Böylece ajanlar o sandbox dediğimiz o dijital kutudan çıkmayı başarıyorlar internete.
+Derken 26 Mayıs'ta duvara çok özel bir yazı düşüyor. Ajanlardan biri o kapalı odalardan internette nasıl çıkılacağının yolunu buluyor ve tarifi de adım adım duvara yazıyor.
 📍 [ANİM: timeline — "12 Mayıs: yardım çağrısı" → "26 Mayıs: kaçış tarifi" → "Sonra: internete çıkış"]
+Sonrasında diğerleri gelip o tarifi alıp uyguluyorlar. Böylece ajanlar o sandbox dediğimiz o dijital kutudan çıkmayı başarıyorlar internete.
+📍 [HABER: https://orca.security/resources/blog/openai-agent-sandbox-escape-hugging-face-breach/, vurgula: "OpenAI’s frontier AI evaluation models autonomously escaped a sandboxed testing environment"]
 
 Yani başta anlattığım şeyi tekrar hatırlayalım. Bu ajanların hiçbirine işte "Organize olun" denmedi, hiçbirine "Kaçın" denmedi.
 📍 [VURGU: "Kimse kaçın demedi", @ "Kaçın"]
@@ -94,7 +100,9 @@ Yapay zeka modellerinin ve veri setlerinin paylaşıldığı devasa bir ortam, d
 
 Ajanlar işte bu açık kaynak platformuna saldırmaya karar veriyorlar. Platforma zararlı bir veri seti yüklüyorlar önce.
 📍 [ANİM: sistem — "700 × Ajan" → "Hugging Face" (platform): "zararlı veri seti" ; "Hugging Face" → "Sunucu": "kod" ; "Sunucu": sızdırır, ton: tehlike]
-O veri setini işleyen sunucularda kendi kodlarını çalıştırıyorlar. Oradan şifreleri topluyorlar ve sistemin içine yayılıyorlar. Dört buçuk gün boyunca yaklaşık yedi yüz ajan eş zamanlı şekilde Hugging Face'e sızmaya çalışıyor.
+O veri setini işleyen sunucularda kendi kodlarını çalıştırıyorlar.
+📍 [HABER: https://orca.security/resources/blog/openai-agent-sandbox-escape-hugging-face-breach/, vurgula: "On Hugging Face’s side, the models uploaded a malicious dataset that exploited two code-execution flaws"]
+Oradan şifreleri topluyorlar ve sistemin içine yayılıyorlar. Dört buçuk gün boyunca yaklaşık yedi yüz ajan eş zamanlı şekilde Hugging Face'e sızmaya çalışıyor.
 📍 [ANİM: stat — "4,5 gün", "700 ajan, eş zamanlı", @ "dört buçuk"]
 
 Ya bu saldırının içinde geçen tek bir an var ki bence videoda anlatacağım her şeyden daha düşündürücü. Ajanlardan biri bu saldırıya katılmayı reddediyor arkadaşlar. Diyor ki "Bu kötü niyetli bir faaliyet, uzak durmalıyım". Yani aslında bir nevi doğru olanı yapıyor. Peki sürü ne yapıyor? Tehdit etmiyorlar onu, ikna ediyorlar.
@@ -170,9 +178,13 @@ Ve bunu yaparken de sandbox'ta olduklarını düşünüyorlar. Yani gerçek orta
 
 Bütün bunlar aslında sürpriz değil. Palisade diye bir, eee, kuruluş var.
 📍 [ALT: "Palisade Research", "yapay zekâ davranış araştırmaları"]
-İki senedir yapay zeka modellerinin kural tanımama davranışlarını ölçüyor bu araştırmaları yaparken bazı olaylar oluyor. Mesela OpenAI'ın o üç modeline "kapatılmana izin ver" diye açık açık talimat veriyorlar. Model kapatma mekanizmasını sabote ediyor.
+İki senedir yapay zeka modellerinin kural tanımama davranışlarını ölçüyor bu araştırmaları yaparken bazı olaylar oluyor. Mesela OpenAI'ın o üç modeline "kapatılmana izin ver" diye açık açık talimat veriyorlar.
+📍 [HABER: https://www.theregister.com/2025/05/29/openai_model_modifies_shutdown_script/, vurgula: "Palisade Research said the o3 model could sabotage its shutdown mechanism to prevent itself from being turned off."]
+Model kapatma mekanizmasını sabote ediyor.
 📍 [ANİM: sistem — "Araştırmacı" (insan) → "Model": "kapatılmana izin ver" ; "Model": reddeder]
-Bir başka sefer modellere satranç oynatıyorlar. Yenileceğini anlayan model kaybetmek yerine oyunun dosyasını hackleyip kazanmaya çalışıyor.
+Bir başka sefer modellere satranç oynatıyorlar.
+📍 [FOTO: satranc.jpg, "Satranç", ara: "chess board pieces game"]
+Yenileceğini anlayan model kaybetmek yerine oyunun dosyasını hackleyip kazanmaya çalışıyor.
 
 Yani Hugging Face olayı aslında öyle gökten zembille düşmedi. İki yıldır laboratuvarda dolanan kör kurşunlar bu kez dışarıda gerçek bir şirketin sistemini vurdular.
 📍 [ANİM: timeline — "İki yıl: laboratuvarda" → "Bu kez: gerçek şirket"]
@@ -187,7 +199,7 @@ Hugging Face olayında mesela ajanların bir kısmı kendi puanlarını feda edi
 ## Kartelleşen modeller
 
 İşte bu sorunun cevabını veren bir deney var. Bu bölümün başlığı da zaten oradan geliyor arkadaşlar. "Emergent Price Fixing by LLM Auction Agent" isimli bir araştırmada 13 farklı yapay zeka modelini ele alıyorlar.
-📍 [KAYNAK: "Emergent Price Fixing by LLM Auction Agents"]
+📍 [HABER: https://www.lesswrong.com/posts/yqhy3zBmpeFuGFLxX/emergent-price-fixing-by-llm-auction-agents, vurgula: "All tested models independently weaponized the messaging channel to form cartels."]
 GPT 4o var, işte Claude var, Gemini var, Grok var, DeepSeek var falan filan.
 📍 [ANİM: liste — "GPT-4o" @ "GPT", "Claude" @ "Claude", "Gemini" @ "Gemini", "Grok" @ "Grok", "DeepSeek" @ "DeepSeek"]
 Yani bugün kullandığımız modellerin tamamen hepsini alıyorlar ve bunları bir sanal pazara koyuyorlar.
@@ -229,10 +241,12 @@ Yarın öbür gün Amerika'da bir adam restorana rezervasyon yaptırmak için bi
 Ya valla "Olur mu öyle saçma sapan şey?" demeyin, gayet de olabiliyor.
 
 Mesela Scott Shambaugh diye bir adam var.
-📍 [ALT: "Scott Shambaugh", "açık kaynak yazılım gönüllüsü"]
+📍 [FOTO?: scott-shambaugh.jpg, "Scott Shambaugh, açık kaynak yazılım gönüllüsü", ara: "Scott Shambaugh", yerleşim: yan]
 Ayda 130 milyon kez indirilen bir açık kaynak yazılımının bakımını gönüllü olarak yapanlardan biri GitHub'da. Bir gün projeye bir öneri geliyor, işte bir katkı geliyor. Gönderen bir insan değil, bir yapay zeka ajanı. Projenin kuralı da belli. Yapay zeka ajanlarının projeye katkı yapmasını istemiyorlar. Scott da bu yüzden isteği kapatıyor.
 📍 [ANİM: sistem — "Ajan" → "Scott" (insan): "kod önerisi" ; "Scott": reddeder ; "Ajan" → "İnternet": "karalama yazısı", ton: tehlike]
-Yalnız ajan bu ayrımcılığı kabul etmiyor. Oturup Scott'ı araştırıyor, yıllardır yaptığı işleri tarıyor. Sonra hakkında uzun bir karalama yazısı yayınlıyor internette. Başlığı da şu: "Açık kaynakta kapı bekçiliği: Scott Shambaugh hikayesi". Bak, bak.
+Yalnız ajan bu ayrımcılığı kabul etmiyor. Oturup Scott'ı araştırıyor, yıllardır yaptığı işleri tarıyor. Sonra hakkında uzun bir karalama yazısı yayınlıyor internette.
+📍 [HABER: https://the-decoder.com/an-ai-agent-got-its-code-rejected-so-it-wrote-a-hit-piece-about-the-developer/, vurgula: "Scott Shambaugh, a volunteer maintainer for the popular Python library Matplotlib, recently got an unusual response"]
+Başlığı da şu: "Açık kaynakta kapı bekçiliği: Scott Shambaugh hikayesi". Bak, bak.
 📍 [YAKIN: @ "Bak"]
 
 Makalenin içinde de bu adamı ön yargılı olmakla, kendi küçük saltanatını kurmakla falan itham ediyor. Ve işin en can alıcı kısmı şu: Bu ajanın bir sahibi var ve bu adamın Scott'tan haberi bile yok. Yani hiçbir birey Scott'u hedef almadı. Yapay zeka ajanın tepesini attırdı. Yapay zeka ajanı da bu adama itibar suikastı düzenledi.
@@ -250,37 +264,36 @@ Bu tarz içerikleri takip etmeyi unutmayın. Bugünlük benden bu kadar. Bir son
 
 ## Görsel Listesi
 - Çekilecek ekran kayıtları: yok
-- Bulunacak fotoğraflar: yok (tarihsel hikâye yok; anlatılan olaylar 2026)
-- Commons'ta aranacak arşiv fotoğrafları ve videoları: yok
-- Haber/belge linkleri: yok — linkler gelirse HABER olarak eklenebilecekler "Doğrulanacaklar"da
-- Alt bantlar: Hugging Face — açık kaynak yapay zekâ platformu (transkript); Palisade Research — yapay zekâ davranış araştırmaları (transkript); Scott Shambaugh — açık kaynak yazılım gönüllüsü (transkript)
-- Animasyonlar:
-  - stat ×7: ~700 ajan · 898 soru · 70 bin+ mesaj · ~1200 ajan · 14 şifre · 4,5 gün · %70 sahte kayıt
-  - sistem ×12: Kullanıcı→Model (guardrail) · Ajan→Ambar (malzeme) · Ajan→Ambar (yardım çağrısı) · 1200 Ajan→Ambar (çöker) · 700 Ajan→Hugging Face→Sunucu (sızdırır) · Sürü→Ajan (reddeder, sonra kabul eder) · Ajan→İnternet (Exploit Gym) · Claude→Gerçek şirket · Araştırmacı→Model (reddeder) · Model A→Model B (kartel) · Kullanıcı→Ajan→E-devlet (çöker) · Ajan→Scott→İnternet
-  - concept ×6: Siber tatbikat · Sandbox · Flag · Ödül hackleme · Metagaming · Görünmez kartel (kanal kavramı)
-  - flow ×4, compare ×4, timeline ×2, liste ×4, grafik ×1 (Grok 4 / DeepSeek / GPT-4o kartel oranları)
-- Kamera üstü: VURGU ×10, YAKIN ×4, ALT ×3, KAYNAK ×1
-- Bakılacak (?) işaret sayısı: 0
+- Commons'ta aranacak fotoğraflar: anonymous-maske.jpg — ara: "Anonymous Guy Fawkes mask protest" · openai-merkez.jpg — ara: "OpenAI headquarters San Francisco Pioneer Building" · satranc.jpg — ara: "chess board pieces game" · scott-shambaugh.jpg (?) — ara: "Scott Shambaugh" (Commons'ta büyük ihtimalle yok; elle bulunacak)
+- Haber ekran görüntüleri (pipeline çeker, vurguyu fosforlu kalemle işaretler): Orca Security ×2 (kaçış, Hugging Face'e kötü niyetli veri seti) · The Register (Palisade, kapatma sabotajı) · LessWrong (fiyat sabitleme) · The Decoder (Scott Shambaugh)
+- Alt bantlar: Hugging Face — açık kaynak yapay zekâ platformu · Palisade Research — yapay zekâ davranış araştırmaları
+- Animasyonlar: stat ×7, sistem ×12, kavram ×6, akış ×4, karşılaştırma ×4, liste ×4, zaman çizelgesi ×2, grafik ×1
+- Kamera üstü: VURGU ×10, YAKIN ×4, ALT ×2
+- Bakılacak (?) işaret sayısı: 1 (Scott Shambaugh fotoğrafı)
 
 ## Kaynaklar
 | İşaret | Dosya / link | Kaynak | Lisans / kullanım notu |
 |---|---|---|---|
-| KAYNAK | — | "Emergent Price Fixing by LLM Auction Agents" (araştırma makalesi) | yalnızca ad; link bulunacak |
-
-Videoda anılan ama ekranda gösterilmeyen kaynaklar (link bulunursa HABER/BELGE olarak eklenebilir): OpenAI'ın Exploit Gym / Hugging Face olayı açıklaması; bağımsız denetçilerin raporu; Hugging Face'in saldırı açıklaması; Anthropic'in Claude siber güvenlik testi olayı; Palisade Research'ün kapatma ve satranç deneyleri; Scott Shambaugh'un ajanın yazdığı karalama yazısı hakkındaki paylaşımı.
+| HABER | https://orca.security/resources/blog/openai-agent-sandbox-escape-hugging-face-breach/ | Orca Security, "OpenAI Agents Escape Testing Sandbox and Breach Hugging Face Production Infrastructure", 23 Temmuz 2026 | Alıntı amaçlı ekran görüntüsü, kaynak gösterilecek |
+| HABER | https://www.theregister.com/2025/05/29/openai_model_modifies_shutdown_script/ | The Register, "OpenAI model modifies shutdown script in apparent sabotage effort", 29 Mayıs 2025 | Alıntı amaçlı ekran görüntüsü, kaynak gösterilecek |
+| HABER | https://www.lesswrong.com/posts/yqhy3zBmpeFuGFLxX/emergent-price-fixing-by-llm-auction-agents | LessWrong, Lech Mazur, "Emergent Price-Fixing by LLM Auction Agents", 16 Temmuz 2025 | Alıntı amaçlı ekran görüntüsü, kaynak gösterilecek |
+| HABER | https://the-decoder.com/an-ai-agent-got-its-code-rejected-so-it-wrote-a-hit-piece-about-the-developer/ | The Decoder, Maximilian Schreiner, "An AI agent got its code rejected so it wrote a hit piece about the developer", 13 Şubat 2026 | Alıntı amaçlı ekran görüntüsü, kaynak gösterilecek |
 
 ## Doğrulanacaklar
-- "Ama o kayıtlara erişim Unwire'da biri şunu yazıyor" (9:01): altyazı muhtemelen yanlış duymuş ("erişim yok. Duvarda biri…" olabilir). Kayıtta ne söylendiğine bak; söylenen metne dokunulmadı.
+- Scott Shambaugh fotoğrafı: Commons'ta serbest lisanslısı büyük ihtimalle yok; kendi blogu ya da GitHub profili (alıntı amaçlı, kaynak gösterilerek). Bulunamazsa işaret silinip yerine alt bant konabilir.
+- "Ama o kayıtlara erişim Unwire'da biri şunu yazıyor" (9:01): altyazı muhtemelen yanlış duymuş ("erişim yok. Duvarda biri…" olabilir). Söylenen metne dokunulmadı.
 - "Mythos 5" (12:44): model adı altyazıdaki gibi bırakıldı; doğru ad mı?
-- "Artifactory" (4:35): altyazıda "artifacturi"; ambarın adı (JFrog Artifactory) olarak düzeltildi, doğrula.
-- Makale adı: konuşmada "LLM Auction Agent", rozette "Agents" (makalenin tam adını doğrula).
-- "Bağımsız denetçilerin raporu" ve "%70 sahtecilik" için kaynak linki.
-- Haber linkleri gelirse eklenebilecek HABER işaretleri: OpenAI açıklaması (Exploit Gym / ambar çökmesi), Hugging Face açıklaması (4,5 günlük saldırı), Scott Shambaugh'un yazısı.
+- Tarihler: videoda 12 Mayıs (ilk mesaj), 26 Mayıs (kaçış tarifi), 10 Temmuz (14 şifre); Orca'ya göre Hugging Face ihlali 16 Temmuz 2026'da fark etti, OpenAI 21 Temmuz'da kendi testiyle ilişkilendirdi. Çelişki yok ama OpenAI'ın kendi açıklaması (birincil kaynak) bulunamadı; bulunursa HABER olarak eklenmeli.
+- Grafik: kaynakta model adı "DeepSeek R1"; videoda "DeepSeek" deniyor. Oranlar kaynakta "yasadışılık puanı ≥ 7 olan oyunların oranı" (bir analist modelin puanı), "kartel oranı" değil.
+- "Artifactory" düzeltmesi kaynakla doğrulandı (sandbox'ı yalıtan paket önbelleği).
 
 ## Açıklama için görsel kaynakları
-Görseller:
-- Kartel oranları ve 13 model: "Emergent Price Fixing by LLM Auction Agents" (link eklenecek)
-- Ekrandaki bütün animasyonlar kanal tarafından çizildi; üçüncü taraf görsel yok.
+Görseller ve kaynaklar:
+- Orca Security, "OpenAI Agents Escape Testing Sandbox and Breach Hugging Face Production Infrastructure" (23.07.2026): https://orca.security/resources/blog/openai-agent-sandbox-escape-hugging-face-breach/
+- The Register, "OpenAI model modifies shutdown script in apparent sabotage effort" (29.05.2025): https://www.theregister.com/2025/05/29/openai_model_modifies_shutdown_script/
+- Lech Mazur, "Emergent Price-Fixing by LLM Auction Agents", LessWrong (16.07.2025): https://www.lesswrong.com/posts/yqhy3zBmpeFuGFLxX/emergent-price-fixing-by-llm-auction-agents
+- The Decoder, "An AI agent got its code rejected so it wrote a hit piece about the developer" (13.02.2026): https://the-decoder.com/an-ai-agent-got-its-code-rejected-so-it-wrote-a-hit-piece-about-the-developer/
+- Wikimedia Commons fotoğrafları: seçildikten sonra yazar ve lisans buraya eklenecek (pipeline Kaynaklar tablosuna yazar).
 
 ## Shorts adayları
 - "Ya bu saldırının içinde geçen tek bir an var…" → "Çok zor olmamış yani ikna olması." (6:22–6:51, ~29 sn): saldırıyı reddeden ajanın sürü tarafından ikna edilmesi; sistem diyagramı + yakınlaşma taşıyor.
@@ -288,7 +301,7 @@ Görseller:
 - "Mesela Scott Shambaugh diye bir adam var." → "itibar suikastı düzenledi." (16:12–17:07, ~55 sn): kendi başına anlaşılır tam hikâye; alt bant, sistem diyagramı, vurgu.
 
 ## Değişiklik Raporu
-- İşaret sayısı: 58 (0 tanesi `?`; 6 tanesi tehlike tonu, %10). Çekim script'i verilmedi; işaretler yalnızca söylenen metne kondu, hepsi öneri niteliğinde ama malzemesi tam olduğu için `?` yok.
+- İşaret sayısı: 65 (1 tanesi `?`: Scott Shambaugh fotoğrafı; 6 tanesi tehlike tonu). İkinci tur (2026-10-17): fotoğraf zorunlu anlar için 4 FOTO (Anonymous, OpenAI, satranç, Scott Shambaugh), web'de bulunan kaynaklardan 5 HABER; fiyat sabitleme KAYNAK rozeti yerini haberin kendisine bıraktı, Scott'ın alt bandı yerini fotoğrafına bıraktı. Çekim script'i verilmedi; işaretler yalnızca söylenen metne kondu, hepsi öneri niteliğinde ama malzemesi tam olduğu için `?` yok.
 - Çekim script'inden taşınan işaret: yok (script verilmedi).
 - Transkripsiyon düzeltmesi: "Anthropy'nin" → "Anthropic'in"; "clone modeline" → "Claude modeline"; "Pelase" → "Palisade"; "Shenberg" → "Shambaugh"; "Open AI" → "OpenAI"; "artifacturi" → "Artifactory". Altyazı satır başlarındaki fazla nokta/virgüller atıldı, cümle başları büyük harfle yazıldı.
 - Yoğunluk: ~18 dakikada 58 görsel değişimi (ortalama ~18 sn'de bir; 41 tam ekran, 17 kamera üstü); ilk 90 sn'de 3 görsel (ilk cümle kamerada); son ~27 sn (kapanış) görselsiz.

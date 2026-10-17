@@ -1,5 +1,5 @@
 import React from 'react';
-import {AbsoluteFill, Audio, OffthreadVideo, Sequence, useCurrentFrame} from 'remotion';
+import {AbsoluteFill, Audio, getRemotionEnvironment, OffthreadVideo, Sequence, useCurrentFrame} from 'remotion';
 import {brand} from '../../brand/brand';
 import {chapterCards, sceneSequences, ZOOM_ORIGIN, zoomAt} from '../shared/timeline';
 import {ChapterCard} from './scenes/Overlay';
@@ -28,7 +28,7 @@ const Timeline: React.FC<Omit<MainProps, 'assetBase'>> = ({data, includeSuggeste
   // YAKIN: kurgu kaydı kısa süre yüze yaklaşır (yalnızca render; önizlemede Editor aynı hesabı videoya uygular).
   const zoom = zoomAt(data, frame);
   const {base} = data;
-  const seqs = sceneSequences(data, {includeSuggested, crossfadeFrames: brand.motion.crossfadeFrames});
+  const seqs = sceneSequences(data, {includeSuggested, crossfadeFrames: brand.motion.crossfadeFrames, skipMissing: getRemotionEnvironment().isRendering});
   return (
     <AbsoluteFill style={{background: overlayOnly ? 'transparent' : brand.colors.bg}}>
       {!overlayOnly && base.kind === 'video' ? (

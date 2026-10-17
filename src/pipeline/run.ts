@@ -280,7 +280,7 @@ export const partialPlan = (dir: string, opts: RenderOptions): {ranges: [number,
   if (data.base.kind !== 'video') return null;
   const fps = compositionFps(data);
   const total = Math.max(1, Math.ceil(data.base.durationSec * fps));
-  const seqs = sceneSequences(data, {includeSuggested: opts.includeSuggested ?? true, crossfadeFrames: brand.motion.crossfadeFrames});
+  const seqs = sceneSequences(data, {includeSuggested: opts.includeSuggested ?? true, crossfadeFrames: brand.motion.crossfadeFrames, skipMissing: true});
   const ranges = overlayRanges([...seqs, ...chapterCards(data, brand.chapterCard)], total, 2 * fps);
   const coverage = ranges.reduce((a, [x, y]) => a + y - x + 1, 0) / total;
   if (coverage > PARTIAL_MAX_COVERAGE) return null;
@@ -336,6 +336,8 @@ export const stageRender = (dir: string, emit: Emit, opts: RenderOptions = {}): 
     return Promise.resolve(out);
   }
   const frames = parseFrames(opts.frames);
+  const missing = (JSON.parse(fs.readFileSync(p.scenes, 'utf8')) as ScenesFile).scenes.filter((s) => !s.disabled && s.missingAsset);
+  if (missing.length) emit({type: 'log', text: `Malzemesi eksik ${missing.length} sahne render'a girmiyor (önizlemede yer tutucu): ${missing.map((s) => `satır ${s.line} ${s.missingAsset}`).join(', ')}`});
   const partial = partialPlan(dir, opts);
   if (partial) emit({type: 'log', text: `Parça render'ı: görseller videonun %${Math.round(partial.coverage * 100)}'ini kaplıyor; ${partial.ranges.length} parça render edilip kurgu kaydının üstüne bindirilecek.`});
   return enqueue(

@@ -141,6 +141,14 @@ export const staticVisualChecks = (markers: Marker[], sentences: Sentence[]): Is
     const full = markers.find((x) => x !== m && x.sentenceIndex === m.sentenceIndex && x.props.type !== 'lower' && x.props.type !== 'emphasis' && x.layout !== 'yan');
     if (full) issues.push({line: m.line, level: 'uyarı', msg: `Alt bant, tam ekran görselle (satır ${full.line}) aynı cümlede; görünmez. Kişinin anıldığı başka bir cümleye taşı ya da görseli "yerleşim: yan" yap`});
   }
+  // Belirli kişi/kurum/etkinlik alt bantla anılıp fotoğrafı yoksa: fotoğraf zorunlu (skill, İşaret kuralları 7).
+  const photoNames = markers.filter((m) => m.props.type === 'photo').map((m) => ((m.props as {caption?: string}).caption ?? '').toLocaleLowerCase('tr-TR'));
+  for (const m of markers) {
+    if (m.props.type !== 'lower') continue;
+    const name = m.props.name.toLocaleLowerCase('tr-TR');
+    if (!photoNames.some((c) => c.includes(name)))
+      issues.push({line: m.line, level: 'bilgi', msg: `"${m.props.name}" için fotoğraf yok: kişi, etkinlik, karakter ya da nesneyse FOTO zorunlu (ara: ile Commons'ta aranır)`});
+  }
   // Aynı animasyon türü art arda 2'den fazla: görsel ritim tekdüzeleşir.
   let run: Marker[] = [];
   const flush = () => {

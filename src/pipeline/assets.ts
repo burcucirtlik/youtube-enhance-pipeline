@@ -172,13 +172,28 @@ const dismissOverlays = async (page: import('playwright').Page) => {
 };
 
 // Tarayıcıda çalışan kod düz metin olarak gönderilir: tsx'in eklediği yardımcılar sayfada tanımsız olur.
+// DİKKAT: bu metinler şablon dizgesi (`...`); içindeki düzenli ifadelerde ters bölü iki kez yazılır (\\s), yoksa
+// \s "s" harfine dönüşür (FIND_TEXT bu yüzden "s" harfi olan vurguları bulamıyordu, 2026-10-17).
 const HIDE_OVERLAYS = `(() => {
-  for (const el of Array.from(document.querySelectorAll('body *'))) {
+  // Çerez pencereleri çoğu zaman gölge DOM'da ya da iframe'de: onlara da in.
+  const all = [];
+  const walk = (root) => {
+    for (const el of Array.from(root.querySelectorAll('*'))) {
+      all.push(el);
+      if (el.shadowRoot) walk(el.shadowRoot);
+    }
+  };
+  walk(document.body);
+  for (const el of all) {
     const cs = getComputedStyle(el);
-    if ((cs.position === 'fixed' || cs.position === 'sticky') && el.offsetHeight > 40) el.style.setProperty('display', 'none', 'important');
+    const fixed = cs.position === 'fixed' || cs.position === 'sticky';
+    const consent = /consent|cookie|gdpr|cmp|privacy|didomi|onetrust|usercentrics|sourcepoint|quantcast/i.test((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '') + ' ' + (el.getAttribute('src') || ''));
+    if ((fixed && el.offsetHeight > 40) || (consent && (fixed || el.tagName === 'IFRAME'))) el.style.setProperty('display', 'none', 'important');
   }
-  document.documentElement.style.overflow = 'auto';
-  document.body.style.overflow = 'auto';
+  for (const host of all.filter((el) => el.shadowRoot && getComputedStyle(el).position === 'fixed')) host.style.setProperty('display', 'none', 'important');
+  document.documentElement.style.setProperty('overflow', 'auto', 'important');
+  document.body.style.setProperty('overflow', 'auto', 'important');
+  document.body.style.setProperty('position', 'static', 'important');
 })()`;
 
 /** Metni sayfada bulur (boşluk ve tırnak farklarını yok sayar), ortaya kaydırır. */
@@ -192,13 +207,13 @@ const FIND_TEXT = (needle: string) => `((needle) => {
     if (!parent || ['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(parent.tagName)) continue;
     const v = n.data;
     for (let k = 0; k < v.length; k++) {
-      const ch = /\s/.test(v[k]) ? ' ' : v[k];
+      const ch = /\\s/.test(v[k]) ? ' ' : v[k];
       if (ch === ' ' && text.endsWith(' ')) continue;
       text += ch;
       map.push([n, k]);
     }
   }
-  const target = norm(needle).replace(/\s+/g, ' ').trim();
+  const target = norm(needle).replace(/\\s+/g, ' ').trim();
   const hay = norm(text);
   let idx = hay.indexOf(target);
   if (idx < 0) idx = hay.toLocaleLowerCase('tr-TR').indexOf(target.toLocaleLowerCase('tr-TR'));

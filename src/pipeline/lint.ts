@@ -114,6 +114,8 @@ export const lintScript = (s: ParsedScript, opts: {skillPath?: string} = {}): Li
   const anchored = ms.filter((m) => m.sentenceIndex >= 0).sort((a, b) => a.sentenceIndex - b.sentenceIndex);
   // Alt bant ve vurgu yüzü kapatmaz: tam ekran sayımına ve "kamerada kalmalı" denetimine girmez.
   const fullScreen = anchored.filter((m) => !OVERLAY_TYPES.has(m.props.type) && m.layout !== 'yan');
+  // Fotoğraf ve arşiv videosu zincirleri ritim sınırına takılmaz (Zena: fotoğraf sayısında sınır yok).
+  const fullScreenRun = fullScreen.filter((m) => m.props.type !== 'photo' && m.props.type !== 'clip');
   const wordAt = (si: number) => s.sentences[si]?.wordStart ?? 0;
   if (talking) {
     const avg = s.words.length / Math.max(1, ms.length);
@@ -132,7 +134,7 @@ export const lintScript = (s: ParsedScript, opts: {skillPath?: string} = {}): Li
       if (run.length > 2) add(run[0].line, 'uyarı', `Art arda ${run.length} tam ekran kesme (satır ${run[0].line}–${run.at(-1)!.line}); en fazla 2, sonra yüze dön`);
       run = [];
     };
-    for (const m of fullScreen) {
+    for (const m of fullScreenRun) {
       const p = run.at(-1);
       if (p && m.sentenceIndex - p.sentenceIndex > 1) flush();
       run.push(m);

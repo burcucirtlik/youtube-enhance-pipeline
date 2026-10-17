@@ -124,6 +124,17 @@ export const searchCommons = async (query: string, limit = 25, media: 'image' | 
       description: description || undefined,
     });
   }
+  // Alaka: sorgudaki anlamlı kelimelerin bir kısmı başlıkta ya da açıklamada **tam kelime** olarak geçmeli.
+  // ("Scott Shambaugh" araması "The Scottonian (1921)" kitabını getiriyordu; yaşayan kişi portrelerinde sık.)
+  const STOP = new Set(['the', 'and', 'of', 'in', 'on', 'at', 'a', 'an', 'with', 'for', 'to', 'by', 'from']);
+  const qWords = query.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3 && !STOP.has(w));
+  // Kısa sorgu (kişi adı gibi): hepsi; uzun sorgu: yarısı (en fazla 3).
+  const need = qWords.length <= 3 ? qWords.length : Math.min(3, Math.ceil(qWords.length / 2));
+  const relevant = (c: Candidate) => {
+    const words = new Set(`${c.title} ${c.description ?? ''}`.toLowerCase().split(/[^\p{L}\p{N}]+/u));
+    return qWords.filter((w) => words.has(w)).length >= need;
+  };
+  for (let i = out.length - 1; i >= 0; i--) if (!relevant(out[i])) out.splice(i, 1);
   // Aynı fotoğrafın restore/kırpılmış kopyaları tek aday sayılır.
   const seen = new Set<string>();
   const unique = out.filter((c) => {
