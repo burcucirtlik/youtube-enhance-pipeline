@@ -2,6 +2,8 @@
 
 Bu repo Zena'nın video pipeline'ı: `youtube-script-writer` skill'inin yazdığı script'teki 📍 işaretlerini kurgu kaydına hizalayıp Remotion ile görselleri videonun üstüne yerleştirir. Kullanım: [README.md](README.md).
 
+Depo: https://github.com/burcucirtlik/youtube-enhance-pipeline (gizli). Her karar günlüğü satırı kendi commit'iyle gelir.
+
 **Asıl ürün pipeline'dır.** `videos/` altındaki videolar (ör. `2026-10-80ler-akimi`) çoğunlukla pipeline'ı denemek içindir. Bir test videosunda gelen her geri bildirim, o videoya yama olarak değil **kaynak dosyalara** işlenir ve aşağıdaki karar günlüğüne yazılır.
 
 ## Çalışma kuralı
@@ -57,6 +59,7 @@ Zena bir şeyi beğenmediğinde ya da yeni bir tercih söylediğinde:
 | 2026-10-17 | **Peş peşe iki görsel arasında glitch yok, yumuşak çapraz geçiş.** Aralarında < 0,2 sn olan sahnelerde: önceki sahne `crossfadeFrames` (12 kare ≈ 0,4 sn) boyunca tam görünür kalır, sonraki üstüne yumuşak eğriyle açılır; glitch, ölçek sıçraması ve metnin "çözülme" efekti kapalı (altyazılar düz gelir). Glitch yalnızca kameradan bir görsele geçerken. Doğrulandı: açılıştaki iki Duvar fotoğrafı arası 99–114. kareler. | Zena: "iki görsel arasındaki glitch'i sevmedim, direkt smooth geçiş yapsın." | `Main.tsx` (`crossfadeIn`), `SceneShell.tsx`, `theme.tsx` (`SmoothInCtx`), `brand.motion.crossfadeFrames` |
 | 2026-10-17 | ~~İLLÜSTRASYON = durağan AI görseli + yavaş yakınlaşma, `OPENAI_API_KEY` opsiyonel.~~ Aynı gün kaldırıldı (bir sonraki satır). | Zena sordu: anahtar neden gerekli, görseller hareketli mi. | `assets.ts` |
 | 2026-10-17 | **İllüstrasyon (AI görseli) tamamen kaldırıldı.** Pipeline anahtar yokken bile görsel üretmeye çalışıyor, yer tutucu çiziyordu. Silinenler: OpenAI görsel çağrısı ve istem dosyası (`assets.ts`), `illustration` sahne türü (`types.ts`, `Media.tsx`, `SceneShell.tsx`), `brand.illustration`, zaman çizelgesi ve arayüz etiketleri, skill işaret sözlüğü ve kuralları. Eski script'lerdeki İLLÜSTRASYON satırları parser'da `RETIRED_MARKER` ile atlanır (lint: bilgi). Dört projenin script'inden bu satırlar silindi; editör düzenlemeleri işaret numarası kaydığı için yeniden eşlendi ve aynı cümlelere oturduğu doğrulandı. | Zena: "Şimdilik illüstrasyon kısmını sil projeden", "skill'den de sil". | `markers.ts`, `parse-script.ts`, `assets.ts`, `align.ts`, `util.ts`, `lint.ts`, Remotion, UI, `brand.ts`, SKILL.md |
+| 2026-10-17 | **Git + gizli GitHub deposu.** Depoya kod, skill, belgeler ve her videonun script'i, `project.json`, Descript altyazısı, editör düzenlemeleri (`edits.json`) ve fotoğraf lisans kaydı (`kaynaklar.json`) girer. Videolar, render'lar, indirilen fotoğraflar ve `build/` ara dosyaları girmez (yeniden üretilebilir ya da çok büyük; ~2,6 GB). İlk commit 70 dosya, 2,3 MB. | Mimari incelemede 1. öneri: sürüm kontrolü yoktu. | `.gitignore`, `git`, `gh repo create --private` |
 
 ## Açık sorular / fikirler
 
