@@ -8,6 +8,7 @@ import {collectAssets} from './assets';
 import {loadCandidateSet, loadRegistry, selectCandidate, writeReviewPage} from './commons';
 import {lintScript} from './lint';
 import {parseScript, type Issue} from './parse-script';
+import {FEEDBACK_FILE, writeFeedback} from './feedback';
 import {stageAlign, stageRender, writeReport, type Emit} from './run';
 import {buildTiming} from './timing';
 import {ffprobe, findBaseMedia, fmtTime, paths, pickScript, resolveVideoDir, ROOT, SKILL, VIDEOS} from './util';
@@ -203,6 +204,7 @@ Zena'nın video pipeline'ı
   npm run assets -- <klasör> [--force]             haber ekran görüntüsü, PDF vurgusu, arşiv fotoğrafı adayları, eksik listesi
   npm run foto -- <klasör> [<dosya.jpg> <no>]      arşiv fotoğrafı adaylarını listele / birini seç
   npm run align -- <klasör> [--force]              işaretleri sese hizalar → build/scenes.json (girdiler değişmediyse atlar)
+  npm run stats                                    editör kararları (tutulan/silinen/kaydırılan görseller) → skill istatistik dosyası
   npm run studio -- [<klasör>]                     Remotion Studio önizleme (klasörsüz: bileşen galerisi)
   npm run render -- <klasör> [--oneriler] [--katman] [--kareler 0-299] [--force] [--tam] [--ayrinti]
   npm run pipeline -- <klasör> [--render]          lint → zamanlama → assets → align (→ render)
@@ -235,6 +237,11 @@ const main = async () => {
     }
     case 'foto':
       return cmdFoto(resolveVideoDir(target));
+    case 'stats': {
+      const r = writeFeedback();
+      console.log(`${r.projects} projeden ${r.scenes} görsel → ${path.relative(ROOT, FEEDBACK_FILE)}${r.changed ? '' : c.dim(' (değişmedi)')}`);
+      return;
+    }
     case 'studio':
       return cmdStudio(target && !target.startsWith('--') ? resolveVideoDir(target) : null);
     case 'render':

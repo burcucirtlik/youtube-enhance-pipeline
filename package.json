@@ -24,6 +24,7 @@
     "icon": "tsx scripts/make-icon.ts",
     "launcher": "bash scripts/make-launcher.sh",
     "timing": "tsx src/pipeline/cli.ts timing",
+    "stats": "tsx src/pipeline/cli.ts stats",
     "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {

@@ -12,6 +12,7 @@ import {editsFromScenes, loadEdits, saveEdits} from '../src/pipeline/edits';
 import {parseScript} from '../src/pipeline/parse-script';
 import {loadScript, photoStatus, renderUpToDate, stageAlign, stageFreshness, stagePrepare, stageRender, STAGES, type RunEvent, type StageName} from '../src/pipeline/run';
 import {listJobLogs, loadState, readJobLog, saveJobLog} from '../src/pipeline/state';
+import {writeFeedback} from '../src/pipeline/feedback';
 import {cleanupPlan, diskUsage, gcMedia, ingestAll, ingestProject, runCleanup, type DiskUsage} from '../src/pipeline/media';
 import {ffprobe, findBaseMedia, paths, ROOT, VIDEOS} from '../src/pipeline/util';
 import type {Scene, ScenesFile} from '../src/shared/types';
@@ -370,6 +371,16 @@ app.post('/api/projects/:id/photos', (req, res) => {
   res.json({results, ...detail(req.params.id)});
 });
 
+/** Editör kararları skill'in okuduğu istatistik dosyasına (yanıtı geciktirmeden). */
+const refreshFeedback = () =>
+  setImmediate(() => {
+    try {
+      writeFeedback();
+    } catch (e: any) {
+      console.error('editör istatistikleri:', e.message);
+    }
+  });
+
 /** Editörden gelen sahneler: ham hizalamayla fark alınır, build/edits.json'a yazılır, scenes.json güncellenir. */
 app.put('/api/projects/:id/scenes', (req, res) => {
   const dir = projectDir(req.params.id);
@@ -381,6 +392,7 @@ app.put('/api/projects/:id/scenes', (req, res) => {
   const edits = editsFromScenes(aligned, incoming as Scene[]);
   saveEdits(dir, edits);
   const scenes = stageAlign(dir, () => {});
+  refreshFeedback();
   writeMeta(dir, readMeta(req.params.id));
   res.json({edits: Object.keys(edits).length, scenes});
 });
@@ -389,6 +401,7 @@ app.delete('/api/projects/:id/edits', (req, res) => {
   const dir = projectDir(req.params.id);
   saveEdits(dir, {});
   res.json({scenes: stageAlign(dir, () => {}), edits: loadEdits(dir)});
+  refreshFeedback();
 });
 
 app.post('/api/projects/:id/render', (req, res) => {

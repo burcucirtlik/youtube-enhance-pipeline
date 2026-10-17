@@ -170,6 +170,8 @@ Scriptler artık doğrudan bir video pipeline'ına (Remotion) girdi oluyor. Pipe
 
 **Görsel stil script'in işi değil.** Renk, font, doku, animasyon hızı ve çerçeve pipeline reposundaki `brand/` klasöründe tanımlıdır. İşaretlerde stil tarif etme ("amber renkli", "dramatik zoom" gibi); sadece neyin gösterileceğini yaz.
 
+**İşaret koymadan önce `editor-istatistikleri.md` dosyasını oku** (bu skill'in klasöründe, pipeline otomatik üretir). Zena'nın video editöründe hangi işaret türünü tuttuğunu, sildiğini ya da başka yere taşıdığını gösterir; çok silinen türü daha az ve daha seçici öner, "Çıkarımlar"daki eğilimlere uy. Az örnekli satırlar kural değil, ipucudur.
+
 ### İşaret sözlüğü
 
 Sadece bu türleri kullan; yeni tür uydurma. Bir anı hiçbiri karşılamıyorsa en yakını seç ve "Kayıttan Önce Doğrulanacaklar"a not düş.
@@ -315,7 +317,7 @@ Her bölüm sonrası onay bekle, düzeltme al, sonraki bölüme geç.
 Script tamamlanıp dosya teslim edildikten sonra bu adımı atlamadan çalıştır. Amaç, Zena'nın bu oturumda yaptığı her düzeltmenin bir sonraki scripte ders olarak geçmesi.
 
 1. **Düzeltmeleri topla.** Oturum boyunca Zena'nın sildiği, yeniden yazdığı, "gereksiz", "kopuk", "zayıf", "dilime yakın değil" dediği her yeri ve kendi yazıp verdiği her cümleyi listele. Zena videonun yayınlanan son halini paylaştıysa, taslakla karşılaştır; kayıt sırasında yaptığı değişiklikler en değerli veridir. Kurgu Sonrası Mod çalıştıysa "Değişiklik Raporu → Kayıtta değişen anlatım" listesini kullan: Zena'nın script'teki bir cümleyi çekimde nasıl söylediği, sesinin en doğru kaydıdır.
-   Görsel işaretleri de dahil et: hangi `?` önerileri tutuldu, hangileri silindi, Zena hangi yerlere kendisi işaret ekledi ya da hangi işareti değiştirdi. Video yayınlandıysa ve pipeline'ın son `scenes.json`'ı paylaşıldıysa, kurguda gerçekten kalan sahnelerle script'teki işaretleri karşılaştır.
+   Görsel işaretleri de dahil et: hangi `?` önerileri tutuldu, hangileri silindi, Zena hangi yerlere kendisi işaret ekledi ya da hangi işareti değiştirdi. Bunun sayısal hali `editor-istatistikleri.md`'de (bütün projelerin editör kararları); tekrar eden bir eğilim görürsen "Öğrenilenler"e kural olarak yaz.
 2. **Dersi çıkar, örneği değil.** Her düzeltmeden genellenebilir tek bir kural yaz: "X'i yaptım, Zena Y yaptı, çünkü Z." Tek bir videoya özgü içerik kararlarını (hangi hikâye kesildi) değil, tekrar edecek tercihleri yaz (neden kesildi).
 3. **Ses örneklerini güncelle.** Zena'nın kendi yazdığı güçlü bir açılış, geçiş ya da kapanış varsa "Gerçek Ses Örnekleri"ne ekle.
 4. **Tükenmiş listeleri güncelle.** Bu scriptte kullanılan deyim, pop kültür, analoji, taşıyıcı metafor, tarihsel emsal, kanal kavramı ve kapanış cümlesini ilgili listelere ekle.

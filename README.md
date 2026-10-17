@@ -120,6 +120,10 @@ npm run foto -- 2026-10-kisa-baslik pearl-harbor-1941.jpg 2
 
 Seçilen fotoğraf `assets/` içine kopyalanır. Yazar ve lisans `assets/kaynaklar.json`'a, altyazıya ("· Foto: yazar (lisans)") ve script'in Kaynaklar tablosuna otomatik yazılır. Seçim yapılana kadar önizlemede 1. aday geçici olarak kullanılır. `npm run foto -- <klasör>` hangi fotoğrafların seçim beklediğini listeler. Uygun aday çıkmazsa sorguyu değiştir ya da dosyayı elle `assets/` içine koy.
 
+## Editör istatistikleri → skill
+
+Editörde her kayıtta (ve `npm run stats` ile) bütün projelerin editör kararları toplanır: her işaret türü için tutulan, ≤ 10 sn kaydırılan, başka cümleye taşınan, süresi değişen ve silinen oranı; kesin ve önerilen (?) işaretlerin silinme oranı; yeterli örnek varsa (tür başına ≥ 5) çıkarımlar. Sonuç `.claude/skills/youtube-script-writer/editor-istatistikleri.md` dosyasına yazılır, skill işaret koymadan önce onu okur. Yalnızca editörde en az bir düzenleme yapılmış projeler sayılır.
+
 ## Önerilen (?) işaretler
 
 `📍 [ANİM?: ...]` gibi soru işaretli işaretler studio önizlemesinde köşede "? öneri" rozetiyle görünür, final render'a ise **girmez**. Tutmak istediğin önerinin `?`'ini script'ten sil, ya da hepsini dahil etmek için render'a `--oneriler` ekle.
