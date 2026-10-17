@@ -1,6 +1,7 @@
 import {Player, type PlayerRef} from '@remotion/player';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Main} from '../../../src/remotion/Main';
+import {ZOOM_ORIGIN, zoomAt} from '../../../src/shared/timeline';
 import type {Scene, ScenesFile} from '../../../src/shared/types';
 import {api, fmt, fmtMs, TYPE_LABEL} from '../api';
 import {Timeline} from './Timeline';
@@ -20,6 +21,7 @@ export const Editor: React.FC<{projectId: string; scenes: ScenesFile; onScenes: 
   const [frame, setFrame] = useState(0);
   const [saveState, setSaveState] = useState<'kaydedildi' | 'değişti' | 'kaydediliyor' | string>('kaydedildi');
   const player = useRef<PlayerRef>(null);
+  const dataRef = useRef<ScenesFile>(scenes);
   const media = useRef<HTMLVideoElement & HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(1);
@@ -43,6 +45,10 @@ export const Editor: React.FC<{projectId: string; scenes: ScenesFile; onScenes: 
           last = f;
           player.current?.seekTo(f);
           setFrame(f);
+          // YAKIN: render'daki yakınlaşmanın aynısı videoya.
+          const z = zoomAt(dataRef.current, f);
+          m.style.transform = z !== 1 ? `scale(${z})` : '';
+          m.style.transformOrigin = ZOOM_ORIGIN;
         }
       }
       raf = requestAnimationFrame(tick);
@@ -130,6 +136,7 @@ export const Editor: React.FC<{projectId: string; scenes: ScenesFile; onScenes: 
   };
 
   const data = useMemo(() => ({...scenes, scenes: local}), [scenes, local]);
+  dataRef.current = data;
   const removed = local.filter((s) => s.disabled);
   const timeSec = frame / fps;
   const current = local.find((s) => !s.disabled && timeSec >= s.startSec && timeSec < s.endSec);
@@ -137,7 +144,7 @@ export const Editor: React.FC<{projectId: string; scenes: ScenesFile; onScenes: 
   return (
     <div className="editor">
       <div className="player">
-        <div className="stage" style={{aspectRatio: `${scenes.base.width} / ${scenes.base.height}`}} onClick={toggle}>
+        <div className="stage" style={{aspectRatio: `${scenes.base.width} / ${scenes.base.height}`, overflow: 'hidden'}} onClick={toggle}>
           {scenes.base.kind === 'video' ? (
             <video ref={media} src={`/files/${projectId}/${scenes.base.src}`} playsInline preload="auto" />
           ) : (

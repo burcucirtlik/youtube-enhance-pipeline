@@ -22,7 +22,7 @@ export type WorkerJob = {
   frames?: [number, number];
   concurrency?: number | null;
   /** Parça render'ı: yalnızca bu kare aralıkları Remotion'dan geçer, gerisi kurgu kaydından aynen gelir. */
-  partial?: {ranges: [number, number][]; baseFile: string};
+  partial?: {ranges: [number, number][]; baseFile: string; sfx?: {file: string; sec: number; gain: number}[]};
 };
 export type WorkerEvent =
   | {t: 'bundle'; status: 'önbellekte' | 'paketleniyor' | 'hazır'; ratio?: number}
@@ -195,21 +195,44 @@ const renderPartial = async (job: WorkerJob, ctx: Ctx) => {
   } finally {
     await browser.close({silent: true}).catch(() => {});
   }
-  await compose(baseFile, segs, job.out, ctx.composition.durationInFrames / fps);
+  await compose(baseFile, segs, job.out, ctx.composition.durationInFrames / fps, job.partial!.sfx ?? []);
   send({t: 'done', out: job.out, frames: total});
 };
 
-const compose = (baseFile: string, segs: {file: string; start: number}[], out: string, durationSec: number) =>
+/**
+ * Ses: efekt yoksa kurgu kaydının sesi kopyalanır (yeniden kodlanmaz). Efekt varsa her biri kendi anına kaydırılıp
+ * (adelay) kurgu sesiyle karıştırılır (amix, seviye düşürmeden) ve AAC 192k kodlanır.
+ */
+const compose = (baseFile: string, segs: {file: string; start: number}[], out: string, durationSec: number, sfx: {file: string; sec: number; gain: number}[]) =>
   new Promise<void>((resolve, reject) => {
     const args = ['-hide_banner', '-v', 'error', '-y', '-i', baseFile];
     for (const s of segs) args.push('-itsoffset', s.start.toFixed(6), '-i', s.file);
+    const files = [...new Set(sfx.map((x) => x.file))];
+    for (const f of files) args.push('-i', f);
     const chain = segs.map((_, i) => `[v${i}][${i + 1}:v]overlay=eof_action=pass[v${i + 1}]`);
-    const graph = ['[0:v]null[v0]', ...chain].join(';');
+    const graph = ['[0:v]null[v0]', ...chain];
+    let audio: string[] = ['-map', '0:a?', '-c:a', 'copy'];
+    if (sfx.length) {
+      const first = 1 + segs.length;
+      // Aynı dosya birden çok kez çalınır: asplit ile çoğaltılır.
+      const uses = files.map((f) => sfx.filter((x) => x.file === f));
+      uses.forEach((list, k) => graph.push(`[${first + k}:a]asplit=${list.length}${list.map((_, j) => `[s${k}_${j}]`).join('')}`));
+      const parts: string[] = [];
+      uses.forEach((list, k) =>
+        list.forEach((e, j) => {
+          const ms = Math.max(0, Math.round(e.sec * 1000));
+          graph.push(`[s${k}_${j}]adelay=${ms}|${ms},volume=${e.gain.toFixed(3)}[e${k}_${j}]`);
+          parts.push(`[e${k}_${j}]`);
+        }),
+      );
+      graph.push(`[0:a]${parts.join('')}amix=inputs=${parts.length + 1}:duration=first:normalize=0[aout]`);
+      audio = ['-map', '[aout]', '-c:a', 'aac', '-b:a', '192k'];
+    }
     args.push(
-      '-filter_complex', graph,
-      '-map', `[v${segs.length}]`, '-map', '0:a?',
+      '-filter_complex', graph.join(';'),
+      '-map', `[v${segs.length}]`, ...audio,
       '-c:v', 'libx264', '-crf', '18', '-preset', 'medium', '-pix_fmt', 'yuv420p',
-      '-c:a', 'copy', '-movflags', '+faststart',
+      '-movflags', '+faststart',
       '-progress', 'pipe:1', '-nostats',
       out,
     );

@@ -23,6 +23,8 @@ export const TEXT_LIMITS = {
   conceptDefinitionWords: 12,
   postWords: 35,
   lowerWords: 8,
+  listItemWords: 6,
+  chatTurnWords: 30,
   emphasisWords: 4,
 } as const;
 
@@ -51,6 +53,15 @@ export const screenWords = (p: SceneProps): number => {
       return words(p.text);
     case 'map':
       return words(p.place) + words(p.caption);
+    case 'chart':
+      return p.points.length * 2 + words(p.unit);
+    case 'list':
+      // Maddeler sırayla gelir; okunacak en çok metin son madde anındadır, yarı ağırlık.
+      return Math.ceil(p.items.reduce((a, it) => a + words(it.text), 0) / 2);
+    case 'chat':
+      return p.turns.reduce((a, t) => a + words(t), 0);
+    case 'source':
+      return words(p.name) + words(p.date);
     case 'system':
       // Aktör adları ve mesaj etiketleri; olaylar sırayla geldiği için yarı ağırlıkla.
       return Math.ceil((p.actors.reduce((a, x) => a + words(x.name), 0) + p.events.reduce((a, e) => a + (e.kind === 'msg' ? words(e.label) : 1), 0)) / 2);
@@ -98,6 +109,12 @@ const tooLong = (p: SceneProps): string[] => {
       break;
     case 'emphasis':
       if (words(p.text) > L.emphasisWords) out.push(`vurgu ${words(p.text)} kelime (en fazla ${L.emphasisWords})`);
+      break;
+    case 'list':
+      for (const it of p.items) if (words(it.text) > L.listItemWords) out.push(`liste maddesi "${it.text}" ${words(it.text)} kelime (en fazla ${L.listItemWords})`);
+      break;
+    case 'chat':
+      for (const t of p.turns) if (words(t) > L.chatTurnWords) out.push(`sohbet mesajı ${words(t)} kelime (en fazla ${L.chatTurnWords}; en önemli kısmı al)`);
       break;
   }
   return out;

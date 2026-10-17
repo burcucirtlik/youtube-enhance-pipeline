@@ -17,6 +17,8 @@ export const ANIM_MARKERS = [
   {type: 'code', label: 'Kod', example: '📍 [ANİM: code — dosya.js, satır 4 vurgula]', use: 'kod bloğu (teknik eğitim)'},
   {type: 'concept', label: 'Kavram', example: '📍 [ANİM: concept — "kavramın adı"]', use: 'kanal kavramı / terim kartı'},
   {type: 'system', label: 'Sistem', example: '📍 [ANİM: sistem — "Client" → "Server": "istek" ; "Server": çöker]', use: 'aktörler arasında mesaj ve sonuç (sistem tasarımı)'},
+  {type: 'chart', label: 'Grafik', example: '📍 [ANİM: grafik — "2022: 5", "2023: 12", "2024: 30", birim: "milyar $"]', use: 'zaman içinde değişen rakam (çubuk; "tür: çizgi" ile çizgi)'},
+  {type: 'list', label: 'Liste', example: '📍 [ANİM: liste — "Az yetki ver" @ "yetki", "Logları oku" @ "log"]', use: 'numaralı maddeler, her biri söylendiği anda gelir'},
   {type: 'map', label: 'Harita', example: '📍 [ANİM: map — "Kigali, Ruanda", "1994"]', use: 'olayın geçtiği yer (pipeline konumu bulur)'},
 ] as const;
 
@@ -33,6 +35,7 @@ export const REAL_MARKERS = [
       ['📍 [FOTO: dosya-adi.jpg, "Olay, tarih", ara: "english search query"]', "arşiv fotoğrafı: pipeline Commons'ta aday arar"],
     ],
   },
+  {kind: 'SOHBET', type: 'chat', label: 'Sohbet', examples: [['📍 [SOHBET: Claude, "soru" → "cevap" → "soru" → "cevap"]', 'yapay zekâyla gerçek yazışma (birebir)']]},
   {kind: 'POST', type: 'post', label: 'Gönderi', examples: [['📍 [POST: platform, @kullanici, "gönderi metni"]', 'tweet / sosyal medya gönderisi']]},
   {
     kind: 'KLİP',
@@ -46,6 +49,8 @@ export const REAL_MARKERS = [
 export const OVERLAY_MARKERS = [
   {kind: 'ALT', type: 'lower', label: 'Alt bant', examples: [['📍 [ALT: "Ad Soyad", "unvan / kurum"]', 'kişi ya da kurum ilk geçtiğinde ad + unvan']]},
   {kind: 'VURGU', type: 'emphasis', label: 'Vurgu', examples: [['📍 [VURGU: "iki-dört kelime", @ "söylenen kelime"]', 'espri, sert tespit, akılda kalacak söz']]},
+  {kind: 'YAKIN', type: 'zoom', label: 'Yakınlaşma', examples: [['📍 [YAKIN: @ "söylenen kelime"]', 'kamera kısa süre yüze yaklaşır (espri, ters köşe)']]},
+  {kind: 'KAYNAK', type: 'source', label: 'Kaynak', examples: [['📍 [KAYNAK: "Wired", "2 Mart 2026"]', 'köşede kaynak rozeti: iddianın dayanağı']]},
 ] as const;
 
 /** İşaretin sonuna eklenebilen seçenekler (her türde). */

@@ -162,8 +162,26 @@ export const anchorTime = (s: ParsedScript, si: number, phrase: string, wordTime
   return null;
 };
 
+/** Kelimeyi bu cümleden başlayarak sonraki birkaç cümlede arar (liste maddeleri birkaç cümleye yayılır). */
+export const anchorTimeAfter = (s: ParsedScript, si: number, phrase: string, wordTime: (w: number) => {start: number} | null, span = 15): number | null => {
+  for (let k = si; k < Math.min(s.sentences.length, si + span); k++) {
+    const t = anchorTime(s, k, phrase, wordTime);
+    if (t !== null) return t;
+  }
+  return null;
+};
+
 /** Türe göre ekranda kalma süresi sınırları (sn); verilmeyenler AlignOptions'tan. */
-const DURATION: Partial<Record<SceneProps['type'], [number, number]>> = {lower: [3, 5], emphasis: [1.5, 3], map: [3, 7]};
+const DURATION: Partial<Record<SceneProps['type'], [number, number]>> = {
+  lower: [3, 5],
+  emphasis: [1.5, 3],
+  zoom: [1.2, 4],
+  source: [3, 6],
+  map: [3, 7],
+  chart: [4, 9],
+  chat: [4, 20],
+  list: [4, 40],
+};
 
 const resolveAsset = (dir: string, props: SceneProps, probeCache: Map<string, Probe>): {props: SceneProps; missing?: string} => {
   const p = paths(dir);
@@ -292,7 +310,22 @@ export const buildScenes = (
       let start = at !== null ? Math.max(at - 0.15, groupStart) : groupStart + k * slot;
       start = Math.max(start, prevStart + 0.5);
       prevStart = start;
-      const [minSec, maxSec] = DURATION[props.type] ?? [opts.minSceneSec, opts.maxSceneSec];
+      let [minSec, maxSec] = DURATION[props.type] ?? [opts.minSceneSec, opts.maxSceneSec];
+      // Sohbet okunacak kadar kalır (saniyede ~3 kelime).
+      if (props.type === 'chat') minSec = Math.max(minSec, Math.min(maxSec, props.turns.join(' ').split(/\s+/).length / 3));
+      // Liste: her madde kendi kelimesinde gelir (sonraki cümlelerde de olabilir); sahne son maddeden 3 sn sonra biter.
+      if (props.type === 'list') {
+        let last = 0;
+        props.items = props.items.map((it, i) => {
+          const t = it.at ? anchorTimeAfter(s, si, it.at, wordTime) : null;
+          if (it.at && t === null) warnings.push(`Satır ${m.line}: liste maddesi "${it.text}" için @ "${it.at}" bulunamadı; eşit aralıkla gelecek`);
+          const off = t !== null ? Math.max(0, t - 0.15 - start) : null;
+          const fallback = last + (i === 0 ? 0.3 : 1.2);
+          last = Math.max(off ?? fallback, i === 0 ? 0 : last + 0.4);
+          return {...it, offsetSec: last};
+        });
+        minSec = Math.max(minSec, last + 3);
+      }
       let end = (at !== null ? Math.max(st.end, start + slot) : start + slot) + (k === ms.length - 1 ? opts.tailSec : 0);
       if (props.type === 'screen' && props.mediaDurationSec) end = Math.max(end, start + Math.min(props.mediaDurationSec, opts.maxScreenSec));
       else end = Math.min(Math.max(end, start + minSec), start + maxSec);

@@ -11,7 +11,7 @@ import {parseScript, type ParsedScript} from './parse-script';
 import {killTree, spawnTracked} from './procs';
 import type {WorkerEvent, WorkerJob} from './render-worker';
 import {brand} from '../../brand/brand';
-import {compositionFps, overlayRanges, sceneSequences} from '../shared/timeline';
+import {chapterCards, compositionFps, overlayRanges, sceneSequences, sfxEvents} from '../shared/timeline';
 import {codeHash, dirSig, fileHash, fileSig, forgetStage, hashOf, isFresh, loadState, recordStage, type StageKey} from './state';
 import {buildTiming, timingUpToDate} from './timing';
 import {ffprobe, findBaseMedia, fmtTime, paths, pickScript, ROOT, SKILL} from './util';
@@ -268,23 +268,31 @@ export const photoStatus = (dir: string, parsed: ParsedScript): PhotoStatus[] =>
 export type RenderOptions = {overlay?: boolean; includeSuggested?: boolean; frames?: string; force?: boolean; full?: boolean; signal?: AbortSignal};
 
 /** Görseller videonun bu oranından fazlasını kaplıyorsa parça render'ı kazandırmaz; tam render yapılır. */
-const PARTIAL_MAX_COVERAGE = 0.6;
+const PARTIAL_MAX_COVERAGE = Number(process.env.YTE_PARTIAL_MAX ?? 0.6); // YTE_PARTIAL_MAX: deneme için
 
 /**
  * Parça render'ı yapılabilir mi: tam video (katman değil, kare aralığı değil), kurgu kaydı video ve görseller
  * videonun çoğunu kaplamıyor. Dönen aralıklar kompozisyon kareleri (uçlar dahil).
  */
-export const partialPlan = (dir: string, opts: RenderOptions): {ranges: [number, number][]; baseFile: string; coverage: number} | null => {
+export const partialPlan = (dir: string, opts: RenderOptions): {ranges: [number, number][]; baseFile: string; coverage: number; sfx: {file: string; sec: number; gain: number}[]} | null => {
   if (opts.overlay || opts.frames || opts.full) return null;
   const data: ScenesFile = JSON.parse(fs.readFileSync(paths(dir).scenes, 'utf8'));
   if (data.base.kind !== 'video') return null;
   const fps = compositionFps(data);
   const total = Math.max(1, Math.ceil(data.base.durationSec * fps));
   const seqs = sceneSequences(data, {includeSuggested: opts.includeSuggested ?? true, crossfadeFrames: brand.motion.crossfadeFrames});
-  const ranges = overlayRanges(seqs, total, 2 * fps);
+  const ranges = overlayRanges([...seqs, ...chapterCards(data, brand.chapterCard)], total, 2 * fps);
   const coverage = ranges.reduce((a, [x, y]) => a + y - x + 1, 0) / total;
   if (coverage > PARTIAL_MAX_COVERAGE) return null;
-  return {ranges, baseFile: path.join(dir, data.base.src), coverage};
+  // Ses efektleri parça render'da ffmpeg ile karıştırılır (Remotion parçaları sessiz render eder).
+  const sfx = brand.sound.enabled
+    ? sfxEvents(data, {includeSuggested: opts.includeSuggested ?? true, crossfadeFrames: brand.motion.crossfadeFrames, chapterCard: brand.chapterCard}).map((e) => ({
+        file: path.join(ROOT, 'brand/sfx', `${e.sound}.wav`),
+        sec: e.frame / fps,
+        gain: brand.sound.volume * e.gain,
+      }))
+    : [];
+  return {ranges, baseFile: path.join(dir, data.base.src), coverage, sfx};
 };
 
 /**
@@ -343,7 +351,7 @@ export const stageRender = (dir: string, emit: Emit, opts: RenderOptions = {}): 
       runWorker(
         dir,
         emit,
-        {out, overlay: Boolean(opts.overlay), includeSuggested: opts.includeSuggested ?? true, frames, partial: partial ? {ranges: partial.ranges, baseFile: partial.baseFile} : undefined},
+        {out, overlay: Boolean(opts.overlay), includeSuggested: opts.includeSuggested ?? true, frames, partial: partial ? {ranges: partial.ranges, baseFile: partial.baseFile, sfx: partial.sfx} : undefined},
         opts.signal,
       ).then((r) => ({detail: partial ? `${r.detail} · parça render (%${Math.round(partial.coverage * 100)})` : r.detail})),
     (ahead) => emit({type: 'progress', stage: 'render', ratio: 0, text: `sırada: önünde ${ahead} render var`}),

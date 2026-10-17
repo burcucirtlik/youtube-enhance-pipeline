@@ -1,7 +1,9 @@
 import React from 'react';
-import {AbsoluteFill, Audio, OffthreadVideo, Sequence} from 'remotion';
+import {AbsoluteFill, Audio, OffthreadVideo, Sequence, useCurrentFrame} from 'remotion';
 import {brand} from '../../brand/brand';
-import {sceneSequences} from '../shared/timeline';
+import {chapterCards, compositionFps, sceneSequences, sfxEvents, ZOOM_ORIGIN, zoomAt} from '../shared/timeline';
+import {SFX} from './sfx';
+import {ChapterCard} from './scenes/Overlay';
 import type {ScenesFile} from '../shared/types';
 import {SceneShell} from './SceneShell';
 import {AssetBaseCtx, useSrc} from './theme';
@@ -22,12 +24,20 @@ export const Main: React.FC<MainProps> = ({assetBase, ...props}) => (
 
 const Timeline: React.FC<Omit<MainProps, 'assetBase'>> = ({data, includeSuggested, overlayOnly}) => {
   const src = useSrc();
+  const frame = useCurrentFrame();
   if (!data) return null;
+  // YAKIN: kurgu kaydı kısa süre yüze yaklaşır (yalnızca render; önizlemede Editor aynı hesabı videoya uygular).
+  const zoom = zoomAt(data, frame);
+  const fps = compositionFps(data);
   const {base} = data;
   const seqs = sceneSequences(data, {includeSuggested, crossfadeFrames: brand.motion.crossfadeFrames});
   return (
     <AbsoluteFill style={{background: overlayOnly ? 'transparent' : brand.colors.bg}}>
-      {!overlayOnly && base.kind === 'video' ? <OffthreadVideo src={src(base.src)} /> : null}
+      {!overlayOnly && base.kind === 'video' ? (
+        <AbsoluteFill style={{transform: zoom !== 1 ? `scale(${zoom})` : undefined, transformOrigin: ZOOM_ORIGIN}}>
+          <OffthreadVideo src={src(base.src)} />
+        </AbsoluteFill>
+      ) : null}
       {!overlayOnly && base.kind === 'audio' ? <Audio src={src(base.src)} /> : null}
       {seqs.map(({scene: sc, from, durationInFrames, joinedPrev, joinedNext}) => (
         // Peş peşe iki görsel: aralarında kameraya dönülmez ve glitch yok. Önceki sahne, sonraki üstüne
@@ -39,6 +49,19 @@ const Timeline: React.FC<Omit<MainProps, 'assetBase'>> = ({data, includeSuggeste
             crossfadeIn={joinedPrev}
             face={sc.layout === 'yan' && !overlayOnly && base.kind === 'video' ? {src: src(base.src), from} : undefined}
           />
+        </Sequence>
+      ))}
+      {/* Ses efektleri: yalnızca tam render'da (katman ve önizleme sessiz). */}
+      {!overlayOnly && brand.sound.enabled
+        ? sfxEvents(data, {includeSuggested, crossfadeFrames: brand.motion.crossfadeFrames, chapterCard: brand.chapterCard}).map((e, i) => (
+            <Sequence key={`sfx${i}`} from={e.frame} durationInFrames={Math.round(0.6 * fps)} name={`ses: ${e.sound}`}>
+              <Audio src={SFX[e.sound]} volume={brand.sound.volume * e.gain} />
+            </Sequence>
+          ))
+        : null}
+      {chapterCards(data, brand.chapterCard).map((c) => (
+        <Sequence key={`b${c.n}`} from={c.from} durationInFrames={c.durationInFrames} name={`bölüm ${c.n}: ${c.title}`}>
+          <ChapterCard n={c.n} title={c.title} />
         </Sequence>
       ))}
     </AbsoluteFill>

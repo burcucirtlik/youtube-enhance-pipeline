@@ -1,5 +1,5 @@
 // Kameranın üstünde çizilenler: yüz görünür kalır, arka plan yok.
-// Alt bant (kişi/kurum kartı) ve vurgu (kısa kinetik metin).
+// Alt bant (kişi/kurum kartı), vurgu (kısa kinetik metin), bölüm kartı.
 
 import React from 'react';
 import {interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
@@ -54,6 +54,23 @@ export const Emphasis: React.FC<{text: string}> = ({text}) => {
         }}
       >
         {text.toLocaleUpperCase('tr-TR')}
+      </div>
+    </div>
+  );
+};
+
+/** Bölüm kartı: sol üstte "// BÖLÜM 02" + başlık; kendi Sequence'ında, 1920×1080 tasarım alanında. */
+export const ChapterCard: React.FC<{n: number; title: string}> = ({n, title}) => {
+  const {width, height} = useVideoConfig();
+  const tone = useTone();
+  const v = useEnter(0);
+  const out = useExit(10);
+  const s = Math.min(width / 1920, height / 1080);
+  return (
+    <div style={{position: 'absolute', left: 0, top: 0, width: 1920, height: 1080, transform: `scale(${s})`, transformOrigin: 'top left'}}>
+      <div style={{position: 'absolute', left: brand.frame.padding, top: 70, opacity: out * v, transform: `translateX(${(1 - v) * -50}px)`, borderLeft: `5px solid ${tone.accent}`, background: 'rgba(2,8,5,0.78)', padding: '12px 26px 14px 22px'}}>
+        <div style={{fontFamily: fonts.mono, fontSize: 22, letterSpacing: 5, color: tone.accent2}}>{`// BÖLÜM ${String(n).padStart(2, '0')}`}</div>
+        <Decode text={title} delay={4} style={{display: 'block', fontFamily: fonts.display, fontWeight: 700, fontSize: 46, color: tone.accent, whiteSpace: 'nowrap', ...glow(tone.accent, 0.5)}} />
       </div>
     </div>
   );

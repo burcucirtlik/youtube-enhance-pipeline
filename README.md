@@ -166,10 +166,15 @@ Açılan **Galeri** kompozisyonu bütün animasyon türlerini örnek verilerle g
 | `HABER` | Sayfa görüntüsü + fosforlu kalem + yakınlaşma | Playwright otomatik çeker |
 | `BELGE` | PDF sayfası + vurgu | `assets/rapor.pdf` |
 | `ANİM: sistem` | Sistem tasarımı: rolüne göre ikonlu aktörler (insan, sunucu kasası, silindir veritabanı, robot ajan, tarayıcı…), oklarda akan mesaj paketleri, sonuç durumları (çöker, yavaşlar, kilitlenir, reddeder, sızdırır, kabul eder, cevap verir) | script'teki metin; ikon aktör adından (`src/shared/system-diagram.ts`) ya da `(rol)` |
+| `ANİM: grafik` | Çubuk ya da çizgi (`tür: çizgi`) grafik, değerler sırayla büyür | script'teki "etiket: sayı" değerleri, `birim:` |
+| `ANİM: liste` | Numaralı maddeler, her biri `@` kelimesinde (sonraki cümlelerde de) gelir; sahne son maddeden 3 sn sonra biter | script'teki maddeler |
 | `ANİM: map` | Dünyadan yere yakınlaşan tel kafes harita + işaret | yer adı → koordinat (OpenStreetMap, `build/harita.json`) ya da `konum:` |
 | `FOTO` | Ken Burns + isim/unvan | `assets/kisi.jpg` ya da Commons adayı (`ara:`) |
 | `KLİP` | Sessiz arşiv videosu + künye | Commons video adayı (`ara:`; ≤ 60 sn, ≤ 720p MP4'e çevrilir) ya da `assets/` |
 | `POST` | Gönderi kartı | script'teki metin |
+| `SOHBET` | Yapay zekâ sohbet arayüzü; soru gelir, cevap yazılıyormuş gibi akar | gerçek yazışmanın birebir metni |
+| `YAKIN` | Kurgu kaydı kısa süre yüze yaklaşır (×1,18); önizlemede de | `@` kelimesi |
+| `KAYNAK` | Sağ üstte kaynak rozeti (yayın · tarih), yüz görünür | script'teki metin |
 | `ALT` | Alt bant: ad + unvan (yüz görünür) | script'teki metin |
 | `VURGU` | Kinetik kısa metin (yüz görünür) | script'teki metin |
 | `, @ "kelime"` | Görsel cümle başında değil, o kelime söylenince girer | altyazıdaki kelime zamanı |
@@ -181,6 +186,8 @@ Açılan **Galeri** kompozisyonu bütün animasyon türlerini örnek verilerle g
 - **Hizalamadan sonra:** okuma hızı (saniyede > 3 kelime), 60 sn'den uzun görselsiz aralık, ilk 90 sn'de 3'ten az görsel, son 20 sn'de görsel (bitiş ekranı), YouTube bölüm kuralları (≥ 3 bölüm, her biri ≥ 10 sn).
 
 Yan yana yerleşimde uygulamanın önizlemesi soldaki yüzü kırpmaz (video olduğu gibi altta oynar); render kırpar.
+
+**Otomatik:** her `##` bölümünün başında (açılış hariç) sol üstte 2,4 sn'lik bölüm kartı (`brand.chapterCard`). Görsel girişlerinde kısık ses efektleri (`brand.sound`): tam ekran → whoosh, tehlike tonu → glitch, vurgu/yakınlaşma → pop, alt bant/kaynak/bölüm kartı → blip, rakam/grafik/liste maddesi → tık. Sesler `scripts/make-sfx.sh` ile ffmpeg'de sentezlenir (`brand/sfx/`, lisans yok). Tam render'da Remotion, parça render'da ffmpeg (adelay + amix) karıştırır; önizleme sessiz.
 
 Eksik bir varlık render'ı durdurmaz: o sahne "EKSİK GÖRSEL" yer tutucusuyla çizilir ve raporda listelenir.
 

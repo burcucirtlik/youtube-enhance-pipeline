@@ -141,3 +141,77 @@ describe('sistem diyagramı', () => {
     assert.ok(m.issues.some((i) => /4 aktör/.test(i)));
   });
 });
+
+describe('sohbet, grafik, liste, yakınlaşma, kaynak', () => {
+  it('yazımlar', () => {
+    assert.deepEqual(parseMarker('SOHBET: Claude, "Silebilir misin?" → "Hayır."').props, {type: 'chat', assistant: 'Claude', turns: ['Silebilir misin?', 'Hayır.']});
+    assert.deepEqual(parseMarker('ANİM: grafik — "2022: 1,5", "2023: 1.200", birim: "milyar $", tür: çizgi').props, {
+      type: 'chart',
+      points: [
+        {label: '2022', value: 1.5, display: '1,5'},
+        {label: '2023', value: 1200, display: '1.200'},
+      ],
+      unit: 'milyar $',
+      style: 'line',
+    });
+    const l = parseMarker('ANİM: liste — "Az yetki ver" @ "yetki", "Bol şüphe et"');
+    assert.deepEqual(l.props, {type: 'list', items: [{text: 'Az yetki ver', at: 'yetki'}, {text: 'Bol şüphe et', at: undefined}]});
+    assert.equal(l.at, undefined, 'madde @ işareti işaretin kendi @ seçeneği sanılmaz');
+    const z = parseMarker('YAKIN: @ "yetmezdi"');
+    assert.deepEqual([z.props, z.at], [{type: 'zoom'}, 'yetmezdi']);
+    assert.deepEqual(parseMarker('KAYNAK: "Wired", "2 Mart 2026"').props, {type: 'source', name: 'Wired', date: '2 Mart 2026'});
+  });
+
+  it('liste maddeleri sonraki cümlelerde söylendikleri anda gelir', async () => {
+    const {buildScenes} = await import('../src/pipeline/align');
+    const {tempProject} = await import('./helpers');
+    const p = tempProject();
+    try {
+      const s = parseScript(miniScript('## A\n\nÜç şey yapın.\n📍 [ANİM: liste — "Az yetki" @ "yetki", "Bol şüphe" @ "şüphe"]\nBirincisi az yetki verin. İkincisi bol şüphe edin.'));
+      const t = transcriptFromCues([
+        {start: 0, end: 2, text: 'Üç şey yapın.'},
+        {start: 2, end: 5, text: 'Birincisi az yetki verin.'},
+        {start: 5, end: 8, text: 'İkincisi bol şüphe edin.'},
+      ]);
+      const f = buildScenes(p.dir, p.dir + '/script.final.md', s, t, {file: p.dir + '/x.mp4', kind: 'video', probe: {durationSec: 30, width: 1280, height: 720, fps: 30, hasVideo: true}});
+      const list = f.scenes.find((x) => x.props.type === 'list')!;
+      const items = (list.props as any).items;
+      const abs = items.map((it: any) => list.startSec + it.offsetSec);
+      assert.ok(abs[0] > 3 && abs[0] < 4.5, `1. madde ${abs[0]}`);
+      assert.ok(abs[1] > 6 && abs[1] < 7.5, `2. madde ${abs[1]}`);
+      assert.ok(list.endSec >= abs[1] + 2.9, 'son maddeden 3 sn sonra biter');
+    } finally {
+      p.cleanup();
+    }
+  });
+
+  it('yakınlaşma ve ses efektleri', async () => {
+    const {zoomAt, sfxEvents, ZOOM_SCALE} = await import('../src/shared/timeline');
+    const sc = (id: string, a: number, b: number, props: Scene['props'], danger = false): Scene => ({id, markerId: id, line: 1, kind: 'ANİM', suggested: false, danger, startSec: a, endSec: b, anchorText: '', props});
+    const f: ScenesFile = {
+      version: 1,
+      generatedAt: '',
+      title: '',
+      format: 'talking-head',
+      scriptFile: '',
+      base: {kind: 'video', src: '', durationSec: 60, width: 1280, height: 720, fps: 30},
+      chapters: [{title: 'a', startSec: 0}, {title: 'b', startSec: 30}],
+      scenes: [sc('z', 2, 4, {type: 'zoom'}), sc('s', 10, 13, {type: 'stat', value: '1'}, true), sc('t', 13.05, 16, {type: 'stat', value: '2'})],
+      dropped: [],
+      warnings: [],
+    };
+    assert.equal(zoomAt(f, 30), 1);
+    assert.ok(Math.abs(zoomAt(f, 90) - ZOOM_SCALE) < 1e-9, 'ortada tam yakın');
+    const ev = sfxEvents(f, {includeSuggested: true, crossfadeFrames: 12, chapterCard: {enabled: true, seconds: 2.4}});
+    assert.deepEqual(
+      ev.map((e) => [e.frame, e.sound]),
+      [
+        [60, 'pop'],
+        [300, 'glitch'],
+        [310, 'tick'],
+        [402, 'tick'],
+        [900, 'blip'],
+      ],
+    );
+  });
+});

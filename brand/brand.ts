@@ -59,6 +59,10 @@ export const brand = {
   },
   /** true: önerilen (?) işaretler studio önizlemesinde köşede "? ÖNERİ · SATIR n" rozetiyle gösterilir (render'a hiç girmez). */
   showSuggestedBadge: false,
+  /** Her ## bölümünün başında sol üstte kısa bölüm kartı (yüzü kapatmaz). İlk bölümde (açılış) yok. */
+  chapterCard: {enabled: true, seconds: 2.4},
+  /** Ses efektleri: görseller girerken kısa, kısık sesler (brand/sfx/, scripts/make-sfx.ts üretir). */
+  sound: {enabled: true, volume: 0.35},
 } as const;
 
 export type Brand = typeof brand;

@@ -88,7 +88,8 @@ export const parseMarker = (inner: string): ParsedMarker => {
   let layout: Layout | undefined;
   let at: string | undefined;
   for (;;) {
-    const opt = body.match(/,?\s*(?:ton\s*:\s*([\p{L}-]+)|yerleşim\s*:\s*([\p{L}-]+)|@\s*(?:"([^"]+)"|“([^”]+)”))\s*$/u);
+    // Seçenek virgülle ayrılır (ya da gövdenin tek içeriğidir: "YAKIN: @ ..."); liste maddesindeki "madde" @ "kelime" seçenek değildir.
+    const opt = body.match(/(?:^|,)\s*(?:ton\s*:\s*([\p{L}-]+)|yerleşim\s*:\s*([\p{L}-]+)|@\s*(?:"([^"]+)"|“([^”]+)”))\s*$/u);
     if (!opt) break;
     body = body.slice(0, opt.index).trim();
     if (opt[1]) {
@@ -174,6 +175,22 @@ const parseBody = (kind: MarkerKind, body: string, issues: string[]): SceneProps
       }
       return {type: 'photo', file, caption, search};
     }
+    case 'SOHBET': {
+      const [assistant, ...more] = splitTopLevel(body);
+      const turns = quoted(more.join(', '));
+      if (!assistant || /^["“]/.test(assistant)) issues.push('SOHBET: önce yapay zekânın adı gelmeli (SOHBET: Claude, "soru" → "cevap")');
+      if (!turns.length) throw new MarkerError('SOHBET: "soru" → "cevap" biçiminde en az bir mesaj olmalı');
+      if (turns.length > 4) issues.push(`SOHBET: ${turns.length} mesaj (en fazla 4; en önemli soru-cevabı al)`);
+      return {type: 'chat', assistant: (assistant ?? 'Yapay zekâ').replace(/["“”]/g, '').trim(), turns};
+    }
+    case 'YAKIN':
+      if (body.trim()) issues.push('YAKIN: içerik almaz, yalnızca @ "kelime"');
+      return {type: 'zoom'};
+    case 'KAYNAK': {
+      const q = quoted(body);
+      if (!q.length) throw new MarkerError('KAYNAK: "Yayın", "tarih" biçiminde olmalı');
+      return {type: 'source', name: q[0], date: q[1]};
+    }
     case 'ALT': {
       const q = quoted(body);
       if (!q.length) throw new MarkerError('ALT: "Ad Soyad", "unvan" biçiminde olmalı');
@@ -201,7 +218,7 @@ const parseAnim = (body: string, issues: string[]): SceneProps => {
   const m = body.match(/^\s*([a-zA-Z]+)\s*(—|–|-{1,2})\s*([\s\S]*)$/u);
   if (!m) throw new MarkerError('ANİM: "tür — içerik" biçiminde değil (örn. ANİM: flow — "a" → "b")');
   // Türkçe takma adlar: "sistem" → system.
-  const ANIM_ALIAS: Record<string, AnimType> = {sistem: 'system', harita: 'map'};
+  const ANIM_ALIAS: Record<string, AnimType> = {sistem: 'system', harita: 'map', grafik: 'chart', liste: 'list'};
   const sub = (ANIM_ALIAS[m[1].toLocaleLowerCase('tr-TR')] ?? m[1].toLowerCase()) as AnimType;
   if (m[2] !== '—') issues.push(`ANİM: tür ile içerik arasında "—" (uzun tire) olmalı, "${m[2]}" yazılmış`);
   if (!ANIM_TYPES.includes(sub)) throw new MarkerError(`Bilinmeyen animasyon türü: ${m[1]}`);
@@ -259,6 +276,45 @@ const parseAnim = (body: string, issues: string[]): SceneProps => {
       return {type: 'concept', term: q[0] ?? rest, definition: q[1]};
     case 'system':
       return parseSystem(rest, issues);
+    case 'chart': {
+      let body = rest;
+      let unit: string | undefined;
+      let style: 'bar' | 'line' = 'bar';
+      for (;;) {
+        const o = body.match(/,\s*(?:birim\s*:\s*(?:"([^"]*)"|“([^”]*)”)|tür\s*:\s*([\p{L}]+))\s*$/u);
+        if (!o) break;
+        body = body.slice(0, o.index);
+        if (o[3]) {
+          const t = o[3].toLocaleLowerCase('tr-TR');
+          if (t === 'çizgi' || t === 'cizgi') style = 'line';
+          else if (t !== 'çubuk' && t !== 'cubuk') issues.push(`grafik: bilinmeyen tür "${o[3]}" (çubuk ya da çizgi)`);
+        } else unit = (o[1] ?? o[2]).trim();
+      }
+      const points = quoted(body).map((x) => {
+        const m = x.match(/^(.+?)\s*:\s*([-\d.,]+)\s*$/u);
+        if (!m) {
+          issues.push(`grafik: "${x}" "etiket: sayı" biçiminde değil`);
+          return null;
+        }
+        // Türkçe ondalık: "1,5" → 1.5; binlik ayırıcı nokta: "1.200" → 1200.
+        const raw = m[2];
+        const num = Number(/,\d+$/.test(raw) ? raw.replace(/\./g, '').replace(',', '.') : raw.replace(/[.,](?=\d{3}\b)/g, ''));
+        if (!Number.isFinite(num)) {
+          issues.push(`grafik: "${raw}" sayı değil`);
+          return null;
+        }
+        return {label: m[1].trim(), value: num, display: raw};
+      }).filter(Boolean) as {label: string; value: number; display: string}[];
+      if (points.length < 2) issues.push('grafik: en az iki nokta olmalı (tek rakam için stat)');
+      if (points.length > 6) issues.push(`grafik: ${points.length} nokta (en fazla 6; telefonda okunmaz)`);
+      return {type: 'chart', points, unit, style};
+    }
+    case 'list': {
+      const items = [...rest.matchAll(/(?:"([^"]+)"|“([^”]+)”)(?:\s*@\s*(?:"([^"]+)"|“([^”]+)”))?/gu)].map((m) => ({text: (m[1] ?? m[2]).trim(), at: (m[3] ?? m[4])?.trim()}));
+      if (items.length < 2) issues.push('liste: en az iki madde olmalı');
+      if (items.length > 5) issues.push(`liste: ${items.length} madde (en fazla 5)`);
+      return {type: 'list', items};
+    }
     case 'map': {
       // konum: enlem, boylam — verilmezse pipeline yer adından bulur (OpenStreetMap).
       const km = rest.match(/,?\s*konum\s*:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/u);

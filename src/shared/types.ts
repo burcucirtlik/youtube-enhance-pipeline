@@ -27,10 +27,18 @@ export type SceneProps =
   | {type: 'post'; platform: string; handle: string; text: string}
   | {type: 'map'; place: string; caption?: string; lat?: number; lon?: number}
   | {type: 'system'; actors: SystemActor[]; events: SystemEvent[]}
+  | {type: 'chart'; points: {label: string; value: number; display: string}[]; unit?: string; style: 'bar' | 'line'}
+  | {type: 'list'; items: ListItem[]}
+  | {type: 'chat'; assistant: string; turns: string[]}
   | {type: 'clip'; file: string; caption?: string; search?: string; provisional?: boolean; mediaDurationSec?: number}
   // Kameranın üstünde (yüz görünür kalır):
   | {type: 'lower'; name: string; title?: string}
-  | {type: 'emphasis'; text: string};
+  | {type: 'emphasis'; text: string}
+  | {type: 'zoom'}
+  | {type: 'source'; name: string; date?: string};
+
+/** Liste maddesi; at: söylendiği kelime, offsetSec: hizalama doldurur (sahne başından itibaren). */
+export type ListItem = {text: string; at?: string; offsetSec?: number};
 
 /** Tam ekran görsellerin yerleşimi: tam ekran (varsayılan) ya da yan yana (yüz solda, görsel sağda). */
 export type Layout = 'tam' | 'yan';
