@@ -86,15 +86,28 @@ Bir kez daha.
     warnings: [],
   });
 
-  it('hizalama sonrası: okuma hızı, uzun boşluk, ilk 90 sn, son 20 sn, bölümler', () => {
+  it('hizalama sonrası: okuma hızı, uzun boşluk, ilk 2 dakika, son 20 sn, bölümler', () => {
     const w = timedVisualChecks(
       file([sc('a', 10, 12, {type: 'quote', text: 'bir iki üç dört beş altı yedi sekiz dokuz on', author: 'X'}), sc('b', 100, 104, {type: 'stat', value: '1'}), sc('c', 185, 190, {type: 'stat', value: '2'})]),
     ).join('\n');
     assert.match(w, /11 kelime 2\.0 sn ekranda; okunamaz/);
     assert.match(w, /0:12–1:40 arası 88 sn görselsiz/);
-    assert.match(w, /İlk 90 saniyede 1 görsel/);
+    assert.match(w, /İlk 2 dakika: 0:12–1:40 arası 88 sn görselsiz/);
+    assert.match(w, /İlk 2 dakika: 1:44–2:00 arası 16 sn görselsiz/);
+    assert.match(w, /İlk 2 dakikada 2 görsel var/);
+    assert.match(w, /İlk 2 dakikada 2 tam ekran görsel var/);
     assert.match(w, /son 20 sn'de görsel var/);
     assert.match(w, /"c" bölümü 5 sn/);
+  });
+
+  it('ilk 2 dakika: 15 sn\'de bir görsel ve 4 tam ekran yeterli; yalnızca alt bant/vurgu yetmez', () => {
+    const dense = Array.from({length: 9}, (_, i) => sc(`d${i}`, 5 + i * 13, 8 + i * 13, i % 2 ? {type: 'emphasis', text: 'evet'} : {type: 'stat', value: String(i)}));
+    const ok = timedVisualChecks(file(dense)).filter((x) => x.startsWith('İlk 2'));
+    assert.deepEqual(ok, []);
+    const thin = Array.from({length: 9}, (_, i) => sc(`e${i}`, 5 + i * 13, 8 + i * 13, i < 2 ? {type: 'stat', value: String(i)} : {type: 'emphasis', text: 'evet'}));
+    const w = timedVisualChecks(file(thin)).join('\n');
+    assert.match(w, /İlk 2 dakikada 2 tam ekran/);
+    assert.doesNotMatch(w, /arası \d+ sn görselsiz \(ilk 2/);
   });
 
   it('çapraz geçiş yalnızca iki tam ekran arasında', () => {

@@ -30,15 +30,17 @@ export const brand = {
     caption: 26,
   },
   motion: {
-    enterFrames: 12, // sahne girişi
-    exitFrames: 8, // sahne çıkışı
+    enterFrames: 14, // kameradan görsele yumuşak geçiş (solarak açılma + çok hafif yakınlaşma; glitch yok)
+    exitFrames: 10, // görselden kameraya yumuşak çıkış
     stagger: 7, // liste öğeleri arası
     spring: {damping: 200, stiffness: 140, mass: 0.8},
     kenBurns: 0.06, // fotoğraf/illüstrasyon yavaş yakınlaşma oranı
-    glitchFrames: 6, // kameradan görsele geçerken kısa glitch girişi
-    crossfadeFrames: 12, // peş peşe iki görsel arasında yumuşak çapraz geçiş (glitch yok)
-    dangerGlitchFrames: 14, // ton: tehlike girişi
-    decodeFrames: 16, // metnin rastgele karakterlerden çözülme süresi
+    crossfadeFrames: 12, // peş peşe iki görsel arasında yumuşak çapraz geçiş
+    // Geçişlerde glitch yok, metinler de rastgele karakterlerden "çözülmez"; yumuşakça belirir (Zena, 2026-10-17).
+    // true yapılırsa eski Matrix çözülmesi geri gelir.
+    textDecode: false,
+    textFadeFrames: 10, // metnin belirme süresi
+    decodeFrames: 16, // (textDecode açıksa) metnin rastgele karakterlerden çözülme süresi
     typingCharsPerSec: 38, // terminal yazma hızı
   },
   frame: {

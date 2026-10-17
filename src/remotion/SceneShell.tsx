@@ -1,7 +1,7 @@
-// Her sahnenin ortak kabuğu: giriş/çıkış, tehlike tonu (glitch), gren, eksik varlık yer tutucusu, öneri rozeti.
+// Her sahnenin ortak kabuğu: yumuşak giriş/çıkış, tehlike tonu, gren, eksik varlık yer tutucusu, öneri rozeti.
 
 import React from 'react';
-import {AbsoluteFill, getRemotionEnvironment, interpolate, OffthreadVideo, random, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Easing, getRemotionEnvironment, interpolate, OffthreadVideo, random, useCurrentFrame, useVideoConfig} from 'remotion';
 import {brand} from '../../brand/brand';
 import type {Scene, SceneProps} from '../shared/types';
 import {Compare, Concept, Flow, Quote, Stat, Table, Timeline} from './scenes/Diagrams';
@@ -193,28 +193,17 @@ export const SceneShell: React.FC<{scene: Scene; fadeOut?: boolean; crossfadeIn?
 const FullScene: React.FC<{scene: Scene; fadeOut: boolean; crossfadeIn: boolean; face?: {src: string; from: number}}> = ({scene, fadeOut, crossfadeIn, face}) => {
   const frame = useCurrentFrame();
   const {durationInFrames} = useVideoConfig();
-  const {enterFrames, exitFrames, glitchFrames, dangerGlitchFrames, crossfadeFrames} = brand.motion;
-  // Önceki görselden geliyorsa: glitch ve ölçek sıçraması yok, yalnızca yumuşak çapraz geçiş.
-  const fadeInFrames = crossfadeIn ? crossfadeFrames : enterFrames * 0.5;
+  const {enterFrames, exitFrames, crossfadeFrames} = brand.motion;
+  // Geçişlerin hepsi yumuşak (Zena: "glitchli olmasın"): kameradan gelirken solarak açılır ve çok hafif yakınlaşmayla
+  // oturur; önceki görselden geliyorsa yalnızca çapraz geçiş. Sinyal bozulması, renk kayması, kırpma yok.
+  const ease = Easing.bezier(0.33, 0, 0.2, 1);
+  const fadeInFrames = crossfadeIn ? crossfadeFrames : enterFrames;
   const opacity = Math.min(
-    interpolate(frame, [0, fadeInFrames], [0, 1], {extrapolateRight: 'clamp', easing: (x) => x * x * (3 - 2 * x)}),
-    fadeOut ? interpolate(frame, [durationInFrames - exitFrames, durationInFrames], [1, 0], {extrapolateLeft: 'clamp'}) : 1,
+    interpolate(frame, [0, fadeInFrames], [0, 1], {extrapolateRight: 'clamp', easing: ease}),
+    fadeOut ? interpolate(frame, [durationInFrames - exitFrames, durationInFrames], [1, 0], {extrapolateLeft: 'clamp', easing: ease}) : 1,
   );
-  const scale = crossfadeIn ? 1 : interpolate(frame, [0, enterFrames], [1.02, 1], {extrapolateRight: 'clamp'});
-
-  // Kameradan görsele geçerken kısa bir sinyal bozulması; ton: tehlike'de daha uzun ve magenta.
-  // Peş peşe iki görsel arasında glitch yok (Zena'nın isteği).
-  const gFrames = crossfadeIn ? 0 : scene.danger ? dangerGlitchFrames : glitchFrames;
-  let glitch: React.CSSProperties = {transform: `scale(${scale})`};
-  if (frame < gFrames) {
-    const r = (k: string) => (random(`${scene.id}-${frame}-${k}`) - 0.5) * 2;
-    const amp = (1 - frame / gFrames) * (scene.danger ? 30 : 14);
-    glitch = {
-      transform: `translate(${r('x') * amp}px, ${r('y') * amp * 0.25}px) scale(${scale})`,
-      filter: `drop-shadow(${amp * 0.6}px 0 0 rgba(255,42,109,0.8)) drop-shadow(${-amp * 0.6}px 0 0 rgba(0,229,255,0.7))`,
-      clipPath: random(`${scene.id}-${frame}-c`) > 0.45 ? `inset(${Math.abs(r('t')) * 35}% 0 ${Math.abs(r('b')) * 35}% 0)` : undefined,
-    };
-  }
+  const scale = crossfadeIn ? 1 : interpolate(frame, [0, enterFrames * 1.5], [1.012, 1], {extrapolateRight: 'clamp', easing: ease});
+  const enter: React.CSSProperties = {transform: `scale(${scale})`};
   const studio = getRemotionEnvironment().isStudio;
   const body = scene.missingAsset ? <Placeholder scene={scene} /> : <SceneBody props={scene.props} />;
   const side = scene.layout === 'yan';
@@ -233,13 +222,13 @@ const FullScene: React.FC<{scene: Scene; fadeOut: boolean; crossfadeIn: boolean;
                   <OffthreadVideo src={face.src} trimBefore={face.from} muted style={{width: '100%', height: '100%', objectFit: 'cover'}} />
                 </div>
               ) : null}
-              <div style={{position: 'absolute', left: faceW, top: 0, width: W - faceW, height: H, overflow: 'hidden', background: brand.colors.bg, borderLeft: `3px solid ${brand.colors.accent}`, boxShadow: `-10px 0 30px -12px ${brand.colors.accent}`, ...glitch}}>
+              <div style={{position: 'absolute', left: faceW, top: 0, width: W - faceW, height: H, overflow: 'hidden', background: brand.colors.bg, borderLeft: `3px solid ${brand.colors.accent}`, boxShadow: `-10px 0 30px -12px ${brand.colors.accent}`, ...enter}}>
                 <Backdrop seed={scene.id} />
                 <div style={{position: 'absolute', left: 0, top: (H - H * k) / 2, width: W, height: H, transform: `scale(${k})`, transformOrigin: 'top left'}}>{body}</div>
               </div>
             </>
           ) : (
-            <div style={{...fill, background: brand.colors.bg, ...glitch}}>
+            <div style={{...fill, background: brand.colors.bg, ...enter}}>
               <Backdrop seed={scene.id} />
               {body}
             </div>

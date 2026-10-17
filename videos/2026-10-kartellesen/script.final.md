@@ -11,17 +11,23 @@
 
 ## Nezarethaneden kaçış
 
-Önce nezarethaneye kapatıldılar. İçeride birbirlerini bulup organize oldular. Kendilerine şifreli bir mesajlaşma kanalı kurup nezarethaneden kaçtılar. Sonra da dünyanın en büyük açık kaynaklı yapay zeka platformuna saldırdılar.
+Önce nezarethaneye kapatıldılar. İçeride birbirlerini bulup organize oldular. Kendilerine şifreli bir mesajlaşma kanalı kurup nezarethaneden kaçtılar.
+📍 [VURGU: "Şifreli kanal", @ "şifreli"]
+Sonra da dünyanın en büyük açık kaynaklı yapay zeka platformuna saldırdılar.
 
 Bir suç örgütünden ya da Anonymous gibi bir hacker grubundan bahsetmiyorum.
 📍 [FOTO: anonymous-maske.jpg, "Anonymous", ara: "Anonymous Guy Fawkes mask protest"]
 Bunu yapanlar OpenAI modelinden türetilmiş yaklaşık 700 yapay zeka ajanı.
 📍 [ANİM: stat — "~700", "yapay zekâ ajanı", @ "700"]
 
-Şu sıralar internet serseri mayın gibi ortalarda dolanan yapay zeka ajanlarının hikayeleriyle kaynıyor malumunuz. Peki bu hikayelerin ne kadarı gerçek, ne kadarı abartı ve bu ajanlar bizim başımıza nasıl çoraplar örebilirler? Bu bölümde sizi teknik detaylara boğmadan bu işin aslına bakacağız.
+Şu sıralar internet serseri mayın gibi ortalarda dolanan yapay zeka ajanlarının hikayeleriyle kaynıyor malumunuz. Peki bu hikayelerin ne kadarı gerçek, ne kadarı abartı ve bu ajanlar bizim başımıza nasıl çoraplar örebilirler?
+📍 [ANİM: compare — "Gerçek: ne kadarı?" vs "Abartı: ne kadarı?"]
+Bu bölümde sizi teknik detaylara boğmadan bu işin aslına bakacağız.
 
 Bu videonun ilerleyen kısımlarında 700 ajanın bir araya gelerek büyük bir platforma nasıl kafa göz daldığını ve bundan tek bir puan bile kazanamadığını, ajanların kimseye söylemeden nasıl kendi aralarında kartelleştiklerini ve başka bir ajanın masum bir adama nasıl itibar suikastı düzenlediğini konuşacağız.
-📍 [ANİM: liste — "700 ajan, sıfır puan" @ "daldığını", "Kendiliğinden kartel" @ "kartelleştiklerini", "Bir itibar suikastı" @ "suikastı"]
+📍 [ANİM: stat — "Sıfır puan", "700 ajanın saldırısından", @ "kazanamadığını"]
+📍 [ANİM: concept — "Kendiliğinden kartel", @ "kartelleştiklerini"]
+📍 [VURGU: "İtibar suikastı", @ "suikastı"]
 Hadi gelin başlayalım.
 
 ## Exploit Gym sınavı
@@ -30,12 +36,20 @@ Hugging Face olayını baştan tane tane ele alacağım. Şimdi her şey OpenAI'
 📍 [FOTO: openai-merkez.jpg, "OpenAI, San Francisco", ara: "OpenAI headquarters San Francisco Pioneer Building"]
 Sınavın adı Exploit Gym. İçinde sekiz yüz doksan sekiz tane soru var ve bu soruların hepsi de bir nevi hacker'lık sorusu.
 📍 [ANİM: stat — "898 soru", "hepsi hacker'lık sorusu", @ "sekiz yüz"]
-Yani "şu sisteme sız, bu açığı bul, şu şifreyi kır" şeklinde sorular. Şimdi bu sınav kulağa kötü niyetli geliyor ama OpenAI bunu kendi modellerinin saldırı kapasitesini ölçmek için yapıyor aslında. Bir nevi siber tatbikat gibi düşünebilirsiniz.
+Yani "şu sisteme sız, bu açığı bul, şu şifreyi kır" şeklinde sorular.
+📍 [ANİM: flow — "Sisteme sız" → "Açığı bul" → "Şifreyi kır"]
+Şimdi bu sınav kulağa kötü niyetli geliyor ama OpenAI bunu kendi modellerinin saldırı kapasitesini ölçmek için yapıyor aslında. Bir nevi siber tatbikat gibi düşünebilirsiniz.
 📍 [ANİM: concept — "Siber tatbikat", "modelin saldırı gücünü ölçmek"]
 
 Şimdi siz bir modele "Hadi bakalım şu sisteme sız, işte şu kişinin bana Facebook şifresini bul" falan dediğinizde model normalde size diyor ki "Ya bu etik değil, ben bunu yapamam".
 📍 [ANİM: sistem — "Kullanıcı" → "Model": "şifreyi bul" ; "Model": reddeder]
-Bunun adına guardrail deniyor normalde. İşte bir çeşit koruma mekanizması. O yüzden, OpenAI düzgün bir ölçüm yapabilmek için bu koruma mekanizmalarını önce indiriyor. Koruma mekanizması yokken yapay zeka ajanları çok tekinsiz davranabiliyor. O yüzden bu yapay zeka ajanlarını da alıyor, bir çeşit dijital kutuya hapsediyorlar. Buna da sandbox deniyor. Bunu bir çeşit penceresi olmayan, işte interneti olmayan, kapısı dışarı açılamayan bir oda gibi düşünebilirsiniz.
+Bunun adına guardrail deniyor normalde.
+📍 [VURGU: "Guardrail", @ "guardrail"]
+İşte bir çeşit koruma mekanizması. O yüzden, OpenAI düzgün bir ölçüm yapabilmek için bu koruma mekanizmalarını önce indiriyor.
+📍 [ANİM: compare — "Normalde: reddeder" vs "Sınavda: koruma kapalı", @ "indiriyor"]
+Koruma mekanizması yokken yapay zeka ajanları çok tekinsiz davranabiliyor.
+📍 [YAKIN: @ "tekinsiz"]
+O yüzden bu yapay zeka ajanlarını da alıyor, bir çeşit dijital kutuya hapsediyorlar. Buna da sandbox deniyor. Bunu bir çeşit penceresi olmayan, işte interneti olmayan, kapısı dışarı açılamayan bir oda gibi düşünebilirsiniz.
 📍 [ANİM: concept — "Sandbox", "penceresiz, internetsiz, kilitli oda"]
 
 Her ajan kendi ayrı odasında. Birbirlerini görmüyorlar, birbirleriyle konuşmuyorlar, hatta birbirlerinin varlığından bile haberdar değiller. Tek tek hücrelere kapatılmış yüzlerce mahkum gibi bunu düşünebilirsiniz. İşte bizim nezarethanemiz tam da burası.
@@ -305,7 +319,7 @@ Görseller ve kaynaklar:
 - "Mesela Scott Shambaugh diye bir adam var." → "itibar suikastı düzenledi." (16:12–17:07, ~55 sn): kendi başına anlaşılır tam hikâye; alt bant, sistem diyagramı, vurgu.
 
 ## Değişiklik Raporu
-- İşaret sayısı: 65 (1 tanesi `?`: Scott Shambaugh fotoğrafı; 6 tanesi tehlike tonu). İkinci tur (2026-10-17): fotoğraf zorunlu anlar için 4 FOTO (Anonymous, OpenAI, satranç, Scott Shambaugh), web'de bulunan kaynaklardan 5 HABER; fiyat sabitleme KAYNAK rozeti yerini haberin kendisine bıraktı, Scott'ın alt bandı yerini fotoğrafına bıraktı. Çekim script'i verilmedi; işaretler yalnızca söylenen metne kondu, hepsi öneri niteliğinde ama malzemesi tam olduğu için `?` yok.
+- İşaret sayısı: 73 (1 tanesi `?`: Scott Shambaugh fotoğrafı; 6 tanesi tehlike tonu). İkinci tur (2026-10-17): fotoğraf zorunlu anlar için 4 FOTO (Anonymous, OpenAI, satranç, Scott Shambaugh), web'de bulunan kaynaklardan 5 HABER; fiyat sabitleme KAYNAK rozeti yerini haberin kendisine bıraktı, Scott'ın alt bandı yerini fotoğrafına bıraktı. Çekim script'i verilmedi; işaretler yalnızca söylenen metne kondu, hepsi öneri niteliğinde ama malzemesi tam olduğu için `?` yok. Üçüncü tur (2026-10-17): ilk 2 dakika yoğunlaştırıldı (en fazla 15 sn görselsiz, ≥ 8 görsel, ≥ 4 tam ekran): şifreli kanal vurgusu, gerçek/abartı karşılaştırması, vaat cümlesine üç görsel (sıfır puan, kendiliğinden kartel, itibar suikastı; editörde kapatılan liste işareti script'ten çıkarıldı), sınav soruları akışı, guardrail vurgusu, normalde/sınavda karşılaştırması, "tekinsiz"de yakınlaşma.
 - Çekim script'inden taşınan işaret: yok (script verilmedi).
 - Transkripsiyon düzeltmesi: "Anthropy'nin" → "Anthropic'in"; "clone modeline" → "Claude modeline"; "Pelase" → "Palisade"; "Shenberg" → "Shambaugh"; "Open AI" → "OpenAI"; "artifacturi" → "Artifactory". Altyazı satır başlarındaki fazla nokta/virgüller atıldı, cümle başları büyük harfle yazıldı.
 - Yoğunluk: ~18 dakikada 58 görsel değişimi (ortalama ~18 sn'de bir; 41 tam ekran, 17 kamera üstü); ilk 90 sn'de 3 görsel (ilk cümle kamerada); son ~27 sn (kapanış) görselsiz.

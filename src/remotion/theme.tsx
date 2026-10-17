@@ -1,7 +1,7 @@
 import {loadFont as loadDisplay} from '@remotion/google-fonts/ChakraPetch';
 import {loadFont as loadMono} from '@remotion/google-fonts/JetBrainsMono';
 import React, {createContext, useContext} from 'react';
-import {random, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
+import {Easing, interpolate, random, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {brand} from '../../brand/brand';
 
 const display = loadDisplay('normal', {weights: ['500', '600', '700'], subsets: ['latin', 'latin-ext']});
@@ -23,7 +23,7 @@ export const useSrc = () => {
   return (p: string) => (base ? base + p.split('/').map(encodeURIComponent).join('/') : staticFile(p));
 };
 
-/** Sahne önceki görselden çapraz geçişle mi giriyor? O zaman metinler "çözülme" efektsiz, düz gelir. */
+/** Sahne önceki görselden çapraz geçişle mi giriyor? O zaman metinler beklemeden, düz gelir. */
 export const SmoothInCtx = createContext(false);
 
 export const W = 1920;
@@ -62,12 +62,18 @@ export const glow = (color: string, strength = 1): React.CSSProperties => ({
 const GLYPHS = 'ｱｲｳｴｵｶｷｸｹｺ01#$%&*<>/\\|=+ABCDEFXYZ0123456789';
 
 /**
- * Matrix çözülmesi: harfler soldan sağa, rastgele karakterlerden gerçek haline oturur.
- * Boşluklar ve noktalama hemen görünür, böylece satır düzeni sabit kalır.
+ * Metnin girişi. Varsayılan: yumuşakça belirir (gecikmesiyle, böylece maddeler sırayla gelir).
+ * brand.motion.textDecode açıksa Matrix çözülmesi: harfler soldan sağa, rastgele karakterlerden gerçek haline oturur;
+ * boşluklar ve noktalama hemen görünür, böylece satır düzeni sabit kalır.
  */
 export const Decode: React.FC<{text: string; delay?: number; style?: React.CSSProperties}> = ({text, delay = 0, style}) => {
   const smooth = useContext(SmoothInCtx);
   const frame = useCurrentFrame() - delay;
+  if (smooth && delay === 0) return <span style={style}>{text}</span>;
+  if (!brand.motion.textDecode) {
+    const o = interpolate(frame, [0, brand.motion.textFadeFrames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.33, 0, 0.2, 1)});
+    return <span style={{...style, opacity: o * (style?.opacity === undefined ? 1 : Number(style.opacity))}}>{text}</span>;
+  }
   if (smooth) return <span style={style}>{text}</span>;
   const dur = brand.motion.decodeFrames;
   if (frame >= dur + 4) return <span style={style}>{text}</span>;

@@ -1,9 +1,10 @@
 // Görsellerin izlenebilirlik denetimleri (youtube-visual-marker skill'inin makineyle denetlenebilen kuralları).
 // - Statik (lint): ekrandaki metnin uzunluğu, aynı animasyon türünün art arda gelmesi, ekrandaki rakamın cümlede geçmesi.
-// - Zamanlı (hizalama sonrası uyarılar): okuma hızı, görselsiz en uzun aralık, ilk 90 sn, son 20 sn, YouTube bölüm kuralları.
+// - Zamanlı (hizalama sonrası uyarılar): okuma hızı, görselsiz en uzun aralık, ilk 2 dakikanın yoğunluğu, son 20 sn, YouTube bölüm kuralları.
 
 import type {Marker, SceneProps, ScenesFile, Sentence} from '../shared/types';
 import type {Issue} from './parse-script';
+import {OVERLAY_TYPES} from '../shared/marker-schema';
 
 const words = (s?: string | null) => (s ? s.split(/\s+/).filter(Boolean).length : 0);
 const lt = (l?: {label?: string; text: string}) => words(l?.label) + words(l?.text);
@@ -172,8 +173,33 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).p
 export const READ_WPS = 3;
 /** Talking head'de görselsiz en uzun aralık (sn). */
 export const MAX_GAP_SEC = 60;
+/**
+ * İlk 2 dakika (izleyicinin en çok kaybedildiği yer) yoğun olur (Zena, 2026-10-17): en fazla 15 sn görselsiz,
+ * en az 8 görsel değişimi, bunların en az 4'ü tam ekran (yalnızca alt bant/vurguyla geçilmez).
+ */
+export const EARLY = {sec: 120, maxGapSec: 15, minVisuals: 8, minFull: 4};
 /** YouTube bitiş ekranı öğeleri son 5–20 sn'ye biner. */
 export const END_SCREEN_SEC = 20;
+
+/** İlk 2 dakikanın yoğunluğu: boşluklar, görsel sayısı, tam ekran sayısı. */
+const earlyDensity = (on: ScenesFile['scenes'], dur: number): string[] => {
+  const out: string[] = [];
+  const end = Math.min(EARLY.sec, dur - END_SCREEN_SEC);
+  if (end <= EARLY.maxGapSec) return out;
+  let prev = 0;
+  for (const s of on) {
+    if (s.startSec >= end) break;
+    if (s.startSec - prev > EARLY.maxGapSec)
+      out.push(`İlk 2 dakika: ${fmt(prev)}–${fmt(s.startSec)} arası ${Math.round(s.startSec - prev)} sn görselsiz (ilk 2 dakikada en fazla ${EARLY.maxGapSec} sn; kamerada kalacak anda ALT/VURGU/YAKIN yeter)`);
+    prev = Math.max(prev, s.endSec);
+  }
+  if (end - prev > EARLY.maxGapSec) out.push(`İlk 2 dakika: ${fmt(prev)}–${fmt(end)} arası ${Math.round(end - prev)} sn görselsiz (en fazla ${EARLY.maxGapSec} sn)`);
+  const early = on.filter((s) => s.startSec < end);
+  const full = early.filter((s) => !OVERLAY_TYPES.has(s.props.type)).length;
+  if (early.length < EARLY.minVisuals) out.push(`İlk 2 dakikada ${early.length} görsel var; izleyici en çok burada kaybedilir (en az ${EARLY.minVisuals})`);
+  if (full < EARLY.minFull) out.push(`İlk 2 dakikada ${full} tam ekran görsel var (en az ${EARLY.minFull}; alt bant ve vurgu tek başına yetmez)`);
+  return out;
+};
 
 /** Zamanlı denetimler: hizalamadan (ve editör düzenlemelerinden) sonra, render'a girecek sahneler üzerinde. */
 export const timedVisualChecks = (f: ScenesFile): string[] => {
@@ -194,8 +220,7 @@ export const timedVisualChecks = (f: ScenesFile): string[] => {
       prev = Math.max(prev, s.endSec);
     }
     if (dur - END_SCREEN_SEC - prev > MAX_GAP_SEC) out.push(`${fmt(prev)}–sonu arası görselsiz`);
-    const early = on.filter((s) => s.startSec < 90).length;
-    if (early < 3) out.push(`İlk 90 saniyede ${early} görsel var; izleyici en çok burada kaybedilir (en az 3 önerilir)`);
+    out.push(...earlyDensity(on, dur));
     for (const s of on) if (s.endSec > dur - END_SCREEN_SEC) out.push(`Satır ${s.line}: son ${END_SCREEN_SEC} sn'de görsel var; bitiş ekranı öğeleriyle çakışır, yüz kalsın`);
   }
   // YouTube bölümleri: ilki 0:00, en az 3 bölüm, her biri en az 10 sn; yoksa YouTube bölümleri göstermez.
