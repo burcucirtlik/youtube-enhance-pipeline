@@ -78,8 +78,10 @@ const summarize = (id: string) => {
   // çalıştıysa (ör. editörden hizalama) hata eskimiş sayılır.
   const state = loadState(dir);
   const lastAt = Math.max(0, ...Object.values(state.stages).map((r) => Date.parse(r!.at)));
+  // İptal hata sayılmaz: önceki çıktı yerinde durur, durum ona göre hesaplanır.
+  const errorOf = (e?: string | null) => (e && !/iptal edildi/i.test(e) ? e : undefined);
   const lastError =
-    job && !job.done ? undefined : state.lastJob?.error && Date.parse(state.lastJob.endedAt) >= lastAt ? state.lastJob.error : job?.error && !state.lastJob ? job.error : undefined;
+    job && !job.done ? undefined : state.lastJob?.error && Date.parse(state.lastJob.endedAt) >= lastAt ? errorOf(state.lastJob.error) : !state.lastJob ? errorOf(job?.error) : undefined;
   if (job && !job.done) {
     status = job.kind === 'render' ? 'render' : 'işleniyor';
     stage = [...job.events].reverse().find((e): e is Extract<RunEvent, {type: 'stage'}> => e.type === 'stage')?.stage ?? null;

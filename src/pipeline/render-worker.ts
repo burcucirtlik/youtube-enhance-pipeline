@@ -8,7 +8,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {bundle} from '@remotion/bundler';
-import {makeCancelSignal, renderMedia, selectComposition} from '@remotion/renderer';
+import {spawn} from 'node:child_process';
+import {makeCancelSignal, openBrowser, renderMedia, selectComposition, type CancelSignal} from '@remotion/renderer';
 import type {MainProps} from '../remotion/Main';
 import {codeHash} from './state';
 import {ROOT} from './util';
@@ -20,10 +21,13 @@ export type WorkerJob = {
   includeSuggested: boolean;
   frames?: [number, number];
   concurrency?: number | null;
+  /** Parça render'ı: yalnızca bu kare aralıkları Remotion'dan geçer, gerisi kurgu kaydından aynen gelir. */
+  partial?: {ranges: [number, number][]; baseFile: string};
 };
 export type WorkerEvent =
   | {t: 'bundle'; status: 'önbellekte' | 'paketleniyor' | 'hazır'; ratio?: number}
   | {t: 'progress'; rendered: number; encoded: number; total: number; stage: string}
+  | {t: 'compose'; ratio: number}
   | {t: 'log'; text: string}
   | {t: 'done'; out: string; frames: number};
 
@@ -116,6 +120,10 @@ const main = async () => {
   const {cancelSignal, cancel} = makeCancelSignal();
   // SIGTERM: Remotion'a iptal de; Chrome'u ve ffmpeg'i kendisi kapatsın. Kapatmazsa üst süreç grubu öldürür.
   process.once('SIGTERM', () => cancel());
+  if (job.partial) {
+    await renderPartial(job, {composition, serveUrl, inputProps, cancelSignal, tmp});
+    return;
+  }
   const total = job.frames ? job.frames[1] - job.frames[0] + 1 : composition.durationInFrames;
   let last = 0;
   await renderMedia({
@@ -138,6 +146,90 @@ const main = async () => {
   });
   send({t: 'done', out: job.out, frames: total});
 };
+
+type Ctx = {composition: Awaited<ReturnType<typeof selectComposition>>; serveUrl: string; inputProps: MainProps; cancelSignal: CancelSignal; tmp: string};
+
+/**
+ * Parça render'ı: konuşan kafa videosunun ~%70'inde görsel yok; o kareleri Chrome'dan geçirmek boşa.
+ * 1) Görsel olan aralıklar normal kompozisyonla (kurgu kaydı + sahne) ayrı ayrı, neredeyse kayıpsız (crf 8) render edilir;
+ *    tarayıcı bir kez açılır, bütün parçalarda kullanılır.
+ * 2) ffmpeg, parçaları kurgu kaydının üstüne kendi zamanlarında bindirir (overlay, eof_action=pass): parça olmayan
+ *    yerlerde kurgu kaydı aynen geçer. Ses kurgu kaydından kopyalanır (yeniden kodlanmaz).
+ */
+const renderPartial = async (job: WorkerJob, ctx: Ctx) => {
+  const {ranges, baseFile} = job.partial!;
+  const fps = ctx.composition.fps;
+  const total = ranges.reduce((a, [x, y]) => a + y - x + 1, 0);
+  const browser = await openBrowser('chrome', {logLevel: 'error'});
+  const segs: {file: string; start: number}[] = [];
+  let done = 0;
+  let last = 0;
+  try {
+    for (const [i, [a, b]] of ranges.entries()) {
+      const file = path.join(ctx.tmp, `parca-${String(i).padStart(3, '0')}.mp4`);
+      await renderMedia({
+        composition: ctx.composition,
+        serveUrl: ctx.serveUrl,
+        inputProps: ctx.inputProps,
+        outputLocation: file,
+        codec: 'h264',
+        crf: 8,
+        x264Preset: 'veryfast',
+        muted: true,
+        frameRange: [a, b],
+        puppeteerInstance: browser,
+        concurrency: job.concurrency ?? null,
+        cancelSignal: ctx.cancelSignal,
+        logLevel: 'error',
+        onProgress: ({renderedFrames}) => {
+          const now = Date.now();
+          if (now - last < 250) return;
+          last = now;
+          send({t: 'progress', rendered: done + renderedFrames, encoded: 0, total, stage: `parça ${i + 1}/${ranges.length}`});
+        },
+      });
+      done += b - a + 1;
+      segs.push({file, start: a / fps});
+      send({t: 'progress', rendered: done, encoded: 0, total, stage: `parça ${i + 1}/${ranges.length}`});
+    }
+  } finally {
+    await browser.close({silent: true}).catch(() => {});
+  }
+  await compose(baseFile, segs, job.out, ctx.composition.durationInFrames / fps);
+  send({t: 'done', out: job.out, frames: total});
+};
+
+const compose = (baseFile: string, segs: {file: string; start: number}[], out: string, durationSec: number) =>
+  new Promise<void>((resolve, reject) => {
+    const args = ['-hide_banner', '-v', 'error', '-y', '-i', baseFile];
+    for (const s of segs) args.push('-itsoffset', s.start.toFixed(6), '-i', s.file);
+    const chain = segs.map((_, i) => `[v${i}][${i + 1}:v]overlay=eof_action=pass[v${i + 1}]`);
+    const graph = ['[0:v]null[v0]', ...chain].join(';');
+    args.push(
+      '-filter_complex', graph,
+      '-map', `[v${segs.length}]`, '-map', '0:a?',
+      '-c:v', 'libx264', '-crf', '18', '-preset', 'medium', '-pix_fmt', 'yuv420p',
+      '-c:a', 'copy', '-movflags', '+faststart',
+      '-progress', 'pipe:1', '-nostats',
+      out,
+    );
+    const ff = spawn('ffmpeg', args, {stdio: ['ignore', 'pipe', 'pipe']});
+    let err = '';
+    ff.stderr.on('data', (d) => (err = (err + d).slice(-3000)));
+    let buf = '';
+    ff.stdout.on('data', (d) => {
+      buf += d;
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';
+      for (const l of lines) {
+        const m = l.match(/^out_time_us=(\d+)/);
+        if (m) send({t: 'compose', ratio: Math.min(1, Number(m[1]) / 1e6 / durationSec)});
+      }
+    });
+    process.once('SIGTERM', () => ff.kill('SIGTERM'));
+    ff.on('error', reject);
+    ff.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg birleştirme başarısız (${code}): ${err.trim().split('\n').slice(-3).join(' | ')}`))));
+  });
 
 main().then(
   () => process.exit(0),

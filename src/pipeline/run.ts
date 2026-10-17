@@ -10,6 +10,8 @@ import {lintScript, type LintResult} from './lint';
 import {parseScript, type ParsedScript} from './parse-script';
 import {killTree, spawnTracked} from './procs';
 import type {WorkerEvent, WorkerJob} from './render-worker';
+import {brand} from '../../brand/brand';
+import {compositionFps, overlayRanges, sceneSequences} from '../shared/timeline';
 import {codeHash, dirSig, fileHash, fileSig, forgetStage, hashOf, isFresh, loadState, recordStage, type StageKey} from './state';
 import {buildTiming, timingUpToDate} from './timing';
 import {ffprobe, findBaseMedia, fmtTime, paths, pickScript, ROOT, SKILL} from './util';
@@ -261,7 +263,27 @@ export const photoStatus = (dir: string, parsed: ParsedScript): PhotoStatus[] =>
 
 // ── Render ─────────────────────────────────────────────────────────────────
 
-export type RenderOptions = {overlay?: boolean; includeSuggested?: boolean; frames?: string; force?: boolean; signal?: AbortSignal};
+export type RenderOptions = {overlay?: boolean; includeSuggested?: boolean; frames?: string; force?: boolean; full?: boolean; signal?: AbortSignal};
+
+/** Görseller videonun bu oranından fazlasını kaplıyorsa parça render'ı kazandırmaz; tam render yapılır. */
+const PARTIAL_MAX_COVERAGE = 0.6;
+
+/**
+ * Parça render'ı yapılabilir mi: tam video (katman değil, kare aralığı değil), kurgu kaydı video ve görseller
+ * videonun çoğunu kaplamıyor. Dönen aralıklar kompozisyon kareleri (uçlar dahil).
+ */
+export const partialPlan = (dir: string, opts: RenderOptions): {ranges: [number, number][]; baseFile: string; coverage: number} | null => {
+  if (opts.overlay || opts.frames || opts.full) return null;
+  const data: ScenesFile = JSON.parse(fs.readFileSync(paths(dir).scenes, 'utf8'));
+  if (data.base.kind !== 'video') return null;
+  const fps = compositionFps(data);
+  const total = Math.max(1, Math.ceil(data.base.durationSec * fps));
+  const seqs = sceneSequences(data, {includeSuggested: opts.includeSuggested ?? true, crossfadeFrames: brand.motion.crossfadeFrames});
+  const ranges = overlayRanges(seqs, total, 2 * fps);
+  const coverage = ranges.reduce((a, [x, y]) => a + y - x + 1, 0) / total;
+  if (coverage > PARTIAL_MAX_COVERAGE) return null;
+  return {ranges, baseFile: path.join(dir, data.base.src), coverage};
+};
 
 /**
  * Render kuyruğu: aynı anda tek render (her biri bütün çekirdekleri kullanıyor). Sıradaki işler bekler,
@@ -295,7 +317,8 @@ const parseFrames = (f?: string): [number, number] | undefined => {
  * - Remotion paketi kod değişmedikçe bir kez üretilir (.cache/remotion); her render'da yeniden paketlenmez,
  *   proje klasörü (750 MB'lık video dahil) pakete kopyalanmaz, bağlanır.
  * - İşçi kendi süreç grubunda ve kendi geçici klasöründe (TMPDIR = build/.render-tmp-*) çalışır. Bitince, hata
- *   verince ya da iptal edilince süreç ağacı kapanır, geçici klasör silinir, yarım çıktı kaldırılır.
+ *   verince ya da iptal edilince süreç ağacı kapanır, geçici klasör silinir. Çıktı önce geçici klasöre yazılır, yalnızca
+ *   başarılı olursa yerine taşınır: iptal edilen yeniden render önceki videoyu silmez.
  */
 export const stageRender = (dir: string, emit: Emit, opts: RenderOptions = {}): Promise<string> => {
   const p = paths(dir);
@@ -311,8 +334,16 @@ export const stageRender = (dir: string, emit: Emit, opts: RenderOptions = {}): 
     return Promise.resolve(out);
   }
   const frames = parseFrames(opts.frames);
+  const partial = partialPlan(dir, opts);
+  if (partial) emit({type: 'log', text: `Parça render'ı: görseller videonun %${Math.round(partial.coverage * 100)}'ini kaplıyor; ${partial.ranges.length} parça render edilip kurgu kaydının üstüne bindirilecek.`});
   return enqueue(
-    () => runWorker(dir, emit, {out, overlay: Boolean(opts.overlay), includeSuggested: opts.includeSuggested ?? true, frames}, opts.signal),
+    () =>
+      runWorker(
+        dir,
+        emit,
+        {out, overlay: Boolean(opts.overlay), includeSuggested: opts.includeSuggested ?? true, frames, partial: partial ? {ranges: partial.ranges, baseFile: partial.baseFile} : undefined},
+        opts.signal,
+      ).then((r) => ({detail: partial ? `${r.detail} · parça render (%${Math.round(partial.coverage * 100)})` : r.detail})),
     (ahead) => emit({type: 'progress', stage: 'render', ratio: 0, text: `sırada: önünde ${ahead} render var`}),
     opts.signal,
   ).then(
@@ -336,7 +367,9 @@ const runWorker = (dir: string, emit: Emit, job: Omit<WorkerJob, 'projectDir'>, 
     const tmp = path.join(p.build, `.render-tmp-${Date.now()}`);
     fs.mkdirSync(tmp, {recursive: true});
     const startedAt = Date.now();
-    const spec: WorkerJob = {...job, projectDir: dir};
+    // İşçi geçici klasöre yazar, başarılıysa yerine taşınır: iptal edilen ya da hata veren yeniden render
+    // önceki iyi videoyu silmez.
+    const spec: WorkerJob = {...job, out: path.join(tmp, 'cikti' + path.extname(job.out)), projectDir: dir};
     const child = spawnTracked(`render ${path.basename(dir)}`, process.execPath, ['--import', 'tsx', path.join(ROOT, 'src/pipeline/render-worker.ts'), JSON.stringify(spec)], {
       cwd: ROOT,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -350,12 +383,11 @@ const runWorker = (dir: string, emit: Emit, job: Omit<WorkerJob, 'projectDir'>, 
     };
     if (signal?.aborted) onAbort();
     signal?.addEventListener('abort', onAbort, {once: true});
-    const cleanup = (ok: boolean) => {
+    const cleanup = () => {
       signal?.removeEventListener('abort', onAbort);
       // Süreç ağacında artakalan (ör. Chrome yardımcıları) varsa onları da kapat.
       if (child.pid) killTree(child.pid, 1000);
       fs.rmSync(tmp, {recursive: true, force: true});
-      if (!ok && fs.existsSync(job.out) && fs.statSync(job.out).mtimeMs >= startedAt) fs.rmSync(job.out, {force: true});
     };
     let buf = '';
     let stderr = '';
@@ -374,9 +406,13 @@ const runWorker = (dir: string, emit: Emit, job: Omit<WorkerJob, 'projectDir'>, 
         }
         if (e.t === 'bundle')
           emit({type: 'progress', stage: 'render', ratio: e.status === 'paketleniyor' ? (e.ratio ?? 0) * 0.05 : 0.05, text: e.status === 'önbellekte' ? 'paket önbellekte' : e.status === 'paketleniyor' ? 'paketleniyor (kod değişti)' : 'paket hazır'});
+        else if (e.t === 'progress' && job.partial)
+          // Paket %5, parçalar %65, birleştirme %30.
+          emit({type: 'progress', stage: 'render', ratio: 0.05 + (e.rendered / e.total) * 0.65, text: `${e.stage} · kare ${e.rendered} / ${e.total}`});
         else if (e.t === 'progress')
           // Paket %5, kareler %85, kodlama %10.
           emit({type: 'progress', stage: 'render', ratio: 0.05 + (e.rendered / e.total) * 0.85 + (e.encoded / e.total) * 0.1, text: e.rendered < e.total ? `kare ${e.rendered} / ${e.total}` : `kodlama ${e.encoded} / ${e.total}`});
+        else if (e.t === 'compose') emit({type: 'progress', stage: 'render', ratio: 0.7 + e.ratio * 0.3, text: `kurgu kaydıyla birleştiriliyor %${Math.round(e.ratio * 100)}`});
         else if (e.t === 'log') emit({type: 'log', text: e.text});
         else if (e.t === 'done') done = true;
       }
@@ -385,16 +421,17 @@ const runWorker = (dir: string, emit: Emit, job: Omit<WorkerJob, 'projectDir'>, 
       stderr = (stderr + d.toString()).slice(-4000);
     });
     child.on('error', (e) => {
-      cleanup(false);
+      cleanup();
       reject(e);
     });
     child.on('close', (code) => {
-      if (cancelled || code !== 0 || !done || !fs.existsSync(job.out)) {
-        cleanup(false);
+      if (cancelled || code !== 0 || !done || !fs.existsSync(spec.out)) {
+        cleanup();
         if (!cancelled && stderr.trim()) emit({type: 'log', text: stderr.trim().split('\n').slice(-6).join(' | ').slice(0, 600)});
         return reject(new Error(cancelled ? 'Render iptal edildi' : `Render başarısız (çıkış kodu ${code})`));
       }
-      cleanup(true);
+      fs.renameSync(spec.out, job.out);
+      cleanup();
       const mb = (fs.statSync(job.out).size / 1e6).toFixed(1);
       resolve({detail: `${path.basename(job.out)} · ${mb} MB · ${Math.round((Date.now() - startedAt) / 1000)} sn`});
     });

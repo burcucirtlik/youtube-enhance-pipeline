@@ -183,7 +183,7 @@ const cmdRender = async (dir: string) => {
   const missing = data.scenes.filter((s) => s.missingAsset && (includeSuggested || !s.suggested)).length;
   if (missing) console.log(c.yellow(`  ${missing} sahnede varlık eksik; yer tutucu çizilecek.`));
   console.log(c.bold(`\n🎬 Render`));
-  const out = await stageRender(dir, consoleEmit, {overlay, includeSuggested, frames: flagVal('--kareler'), force: flags.has('--force')});
+  const out = await stageRender(dir, consoleEmit, {overlay, includeSuggested, frames: flagVal('--kareler'), force: flags.has('--force'), full: flags.has('--tam')});
   console.log(c.green(`  ✓ ${path.relative(ROOT, out)}`));
 };
 
@@ -204,7 +204,7 @@ Zena'nın video pipeline'ı
   npm run foto -- <klasör> [<dosya.jpg> <no>]      arşiv fotoğrafı adaylarını listele / birini seç
   npm run align -- <klasör> [--force]              işaretleri sese hizalar → build/scenes.json (girdiler değişmediyse atlar)
   npm run studio -- [<klasör>]                     Remotion Studio önizleme (klasörsüz: bileşen galerisi)
-  npm run render -- <klasör> [--oneriler] [--katman] [--kareler 0-299] [--force] [--ayrinti]
+  npm run render -- <klasör> [--oneriler] [--katman] [--kareler 0-299] [--force] [--tam] [--ayrinti]
   npm run pipeline -- <klasör> [--render]          lint → zamanlama → assets → align (→ render)
 
 <klasör>: videos/2026-10-kisa-baslik ya da sadece 2026-10-kisa-baslik
