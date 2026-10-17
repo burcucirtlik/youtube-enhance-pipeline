@@ -10,6 +10,7 @@ import {OVERLAY_TYPES} from '../shared/marker-schema';
 import {MapScene} from './scenes/Map';
 import {Clip, Document, News, Photo, Post, Screen} from './scenes/Media';
 import {Emphasis, LowerThird} from './scenes/Overlay';
+import {System} from './scenes/System';
 import {Decode, fill, fonts, glow, H, SmoothInCtx, ToneProvider, useTone, W} from './theme';
 
 const SceneBody: React.FC<{props: SceneProps}> = ({props: p}) => {
@@ -44,6 +45,8 @@ const SceneBody: React.FC<{props: SceneProps}> = ({props: p}) => {
       return <Post platform={p.platform} handle={p.handle} text={p.text} />;
     case 'clip':
       return <Clip file={p.file} caption={p.caption} />;
+    case 'system':
+      return <System actors={p.actors} events={p.events} />;
     case 'map':
       return <MapScene place={p.place} caption={p.caption} lat={p.lat} lon={p.lon} />;
     case 'lower':

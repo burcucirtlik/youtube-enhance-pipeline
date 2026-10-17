@@ -2,6 +2,8 @@
 // - parser'ın tanıdığı türler (src/pipeline/markers.ts) ve TypeScript türleri (src/shared/types.ts)
 // - arayüzdeki tür etiketleri (ui/src/api.ts)
 // - youtube-visual-marker skill'indeki "İşaret sözlüğü" bloğu (SKILL.md; `npm run skill:sync` yazar, test eşitliği denetler)
+import {ACTOR_ROLES, SYSTEM_STATES} from './system-diagram';
+
 // Yeni bir tür eklemek: buraya ekle, parser'a ayrıştırmasını, Remotion'a sahnesini yaz, `npm run skill:sync`.
 
 export const ANIM_MARKERS = [
@@ -14,6 +16,7 @@ export const ANIM_MARKERS = [
   {type: 'terminal', label: 'Terminal', example: '📍 [ANİM: terminal — `komut`]', use: 'komut satırı (teknik eğitim)'},
   {type: 'code', label: 'Kod', example: '📍 [ANİM: code — dosya.js, satır 4 vurgula]', use: 'kod bloğu (teknik eğitim)'},
   {type: 'concept', label: 'Kavram', example: '📍 [ANİM: concept — "kavramın adı"]', use: 'kanal kavramı / terim kartı'},
+  {type: 'system', label: 'Sistem', example: '📍 [ANİM: sistem — "Client" → "Server": "istek" ; "Server": çöker]', use: 'aktörler arasında mesaj ve sonuç (sistem tasarımı)'},
   {type: 'map', label: 'Harita', example: '📍 [ANİM: map — "Kigali, Ruanda", "1994"]', use: 'olayın geçtiği yer (pipeline konumu bulur)'},
 ] as const;
 
@@ -97,6 +100,16 @@ export const skillDictionary = (): string =>
     '**Kameranın üstünde (yüz görünür kalır):**',
     '```',
     column(OVERLAY_MARKERS.flatMap((m): (readonly [string, string])[] => [...m.examples])),
+    '```',
+    '',
+    '**`ANİM: sistem` aktörleri** (ad rolü belirler; belirsizse adın yanına `(rol)` yaz: `"Kayıtlar" (veritabanı)`):',
+    '```',
+    column(ACTOR_ROLES.map((r) => [r.label, r.words.slice(0, 6).join(', ')] as const)),
+    '```',
+    '',
+    '**`ANİM: sistem` durumları** (yalnızca bunlar; `"Server": çöker`):',
+    '```',
+    column(SYSTEM_STATES.map((x) => [x.state, x.look] as const)),
     '```',
     '',
     '**Her işaretin sonuna eklenebilir:**',

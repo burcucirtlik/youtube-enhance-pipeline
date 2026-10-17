@@ -2,7 +2,9 @@
 // burada her türün içeriğinin nasıl ayrıştırıldığı var.
 
 import {ANIM_TYPES, KIND_ALIASES, MARKER_KINDS, RETIRED_MARKERS} from '../shared/marker-schema';
+import {ACTOR_ROLES, roleOf, SYSTEM_LIMITS, SYSTEM_STATES} from '../shared/system-diagram';
 import type {AnimType, LabeledText, Layout, MarkerKind, SceneProps} from '../shared/types';
+import type {SystemActor, SystemEvent} from '../shared/system-diagram';
 
 export const MARKER_LINE = /^\s*📍\s*\[(.*)\]\s*$/u;
 
@@ -198,7 +200,9 @@ const parseBody = (kind: MarkerKind, body: string, issues: string[]): SceneProps
 const parseAnim = (body: string, issues: string[]): SceneProps => {
   const m = body.match(/^\s*([a-zA-Z]+)\s*(—|–|-{1,2})\s*([\s\S]*)$/u);
   if (!m) throw new MarkerError('ANİM: "tür — içerik" biçiminde değil (örn. ANİM: flow — "a" → "b")');
-  const sub = m[1].toLowerCase() as AnimType;
+  // Türkçe takma adlar: "sistem" → system.
+  const ANIM_ALIAS: Record<string, AnimType> = {sistem: 'system', harita: 'map'};
+  const sub = (ANIM_ALIAS[m[1].toLocaleLowerCase('tr-TR')] ?? m[1].toLowerCase()) as AnimType;
   if (m[2] !== '—') issues.push(`ANİM: tür ile içerik arasında "—" (uzun tire) olmalı, "${m[2]}" yazılmış`);
   if (!ANIM_TYPES.includes(sub)) throw new MarkerError(`Bilinmeyen animasyon türü: ${m[1]}`);
   const rest = m[3].trim();
@@ -253,6 +257,8 @@ const parseAnim = (body: string, issues: string[]): SceneProps => {
     }
     case 'concept':
       return {type: 'concept', term: q[0] ?? rest, definition: q[1]};
+    case 'system':
+      return parseSystem(rest, issues);
     case 'map': {
       // konum: enlem, boylam — verilmezse pipeline yer adından bulur (OpenStreetMap).
       const km = rest.match(/,?\s*konum\s*:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/u);
@@ -261,6 +267,57 @@ const parseAnim = (body: string, issues: string[]): SceneProps => {
       return {type: 'map', place: qq[0] ?? rest, caption: qq[1], lat: km ? Number(km[1]) : undefined, lon: km ? Number(km[2]) : undefined};
     }
   }
+};
+
+/**
+ * `"Client" → "Server": "istek" ; "Server": çöker`
+ * Aktör: tırnak içinde ad, isteğe bağlı (rol) ve çoğul için "700 × Ajan". Olaylar ";" ile ayrılır.
+ */
+const parseSystem = (rest: string, issues: string[]): SceneProps => {
+  const actors: SystemActor[] = [];
+  const actorIndex = (raw: string): number => {
+    const m = raw.trim().match(/^(?:"([^"]+)"|“([^”]+)”)\s*(?:\(([^)]+)\))?$/u);
+    if (!m) throw new MarkerError(`sistem: aktör tırnak içinde olmalı: ${raw.trim()}`);
+    let name = (m[1] ?? m[2]).trim();
+    let count: string | undefined;
+    const cm = name.match(/^(\d[\d.,]*\s*[+]?)\s*[×x]\s*(.+)$/u);
+    if (cm) {
+      count = cm[1].trim();
+      name = cm[2].trim();
+    }
+    const explicit = m[3] ? roleOf(m[3]) : null;
+    if (m[3] && explicit === 'box') issues.push(`sistem: bilinmeyen rol "${m[3]}" (${ACTOR_ROLES.map((r) => r.label).join(', ')})`);
+    const key = name.toLocaleLowerCase('tr-TR');
+    const i = actors.findIndex((a) => a.name.toLocaleLowerCase('tr-TR') === key);
+    if (i >= 0) return i;
+    if (name.split(/\s+/).length > SYSTEM_LIMITS.nameWords) issues.push(`sistem: aktör adı "${name}" en fazla ${SYSTEM_LIMITS.nameWords} kelime olmalı`);
+    actors.push({name, role: explicit && explicit !== 'box' ? explicit : roleOf(name), count});
+    return actors.length - 1;
+  };
+  const events: SystemEvent[] = [];
+  for (const part of splitTopLevel(rest, ';')) {
+    const msg = part.match(/^(.+?)\s*(?:→|->)\s*(.+?)(?:\s*:\s*(?:"([^"]*)"|“([^”]*)”))?\s*$/u);
+    if (msg) {
+      events.push({kind: 'msg', from: actorIndex(msg[1]), to: actorIndex(msg[2]), label: msg[3] ?? msg[4]});
+      continue;
+    }
+    const st = part.match(/^(.+?)\s*:\s*([\p{L} ]+)$/u);
+    if (st) {
+      const state = st[2].trim().toLocaleLowerCase('tr-TR');
+      const known = SYSTEM_STATES.find((x) => x.state === state);
+      if (!known) {
+        issues.push(`sistem: bilinmeyen durum "${st[2].trim()}" (${SYSTEM_STATES.map((x) => x.state).join(', ')})`);
+        continue;
+      }
+      events.push({kind: 'state', actor: actorIndex(st[1]), state: known.state});
+      continue;
+    }
+    throw new MarkerError(`sistem: olay anlaşılmadı: ${part} ("A" → "B": "etiket" ya da "A": durum)`);
+  }
+  if (actors.length < 2) issues.push('sistem: en az iki aktör olmalı (tek aktör için concept ya da stat)');
+  if (actors.length > SYSTEM_LIMITS.actors) issues.push(`sistem: ${actors.length} aktör (en fazla ${SYSTEM_LIMITS.actors}; telefonda okunmaz)`);
+  if (events.length > SYSTEM_LIMITS.events) issues.push(`sistem: ${events.length} olay (en fazla ${SYSTEM_LIMITS.events})`);
+  return {type: 'system', actors, events};
 };
 
 /** Kurallar: kısa, küçük harf, Türkçe karaktersiz, tireli. */

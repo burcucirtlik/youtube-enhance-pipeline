@@ -110,3 +110,34 @@ Bir kez daha.
     );
   });
 });
+
+describe('sistem diyagramı', () => {
+  it('aktörler, roller (ad ya da açık rol), çoğul, mesaj ve durum olayları', () => {
+    const m = parseMarker('ANİM: sistem — "700 × Ajan" → "Platform": "saldırı" ; "Platform" → "Kayıtlar" (veritabanı): "sorgu" ; "Kayıtlar": sızdırır');
+    assert.deepEqual(m.props, {
+      type: 'system',
+      actors: [
+        {name: 'Ajan', role: 'agent', count: '700'},
+        {name: 'Platform', role: 'browser', count: undefined},
+        {name: 'Kayıtlar', role: 'database', count: undefined},
+      ],
+      events: [
+        {kind: 'msg', from: 0, to: 1, label: 'saldırı'},
+        {kind: 'msg', from: 1, to: 2, label: 'sorgu'},
+        {kind: 'state', actor: 2, state: 'sızdırır'},
+      ],
+    });
+    assert.deepEqual(m.issues, []);
+  });
+
+  it('rol adından: Türkçe ekler ve büyük harfli kısaltmalar', async () => {
+    const {roleOf} = await import('../src/shared/system-diagram');
+    assert.deepEqual(['Client', 'API', 'Sunucuya', 'Veritabanı', 'Claude', 'Hacker', 'Aile'].map(roleOf), ['person', 'server', 'server', 'database', 'agent', 'hacker', 'box']);
+  });
+
+  it('listede olmayan durum ve sınır aşımı uyarılır', () => {
+    const m = parseMarker('ANİM: sistem — "A" → "B" ; "B" → "C" ; "C" → "D" ; "D": patlar');
+    assert.ok(m.issues.some((i) => /bilinmeyen durum "patlar"/.test(i)));
+    assert.ok(m.issues.some((i) => /4 aktör/.test(i)));
+  });
+});

@@ -51,6 +51,9 @@ export const screenWords = (p: SceneProps): number => {
       return words(p.text);
     case 'map':
       return words(p.place) + words(p.caption);
+    case 'system':
+      // Aktör adları ve mesaj etiketleri; olaylar sırayla geldiği için yarı ağırlıkla.
+      return Math.ceil((p.actors.reduce((a, x) => a + words(x.name), 0) + p.events.reduce((a, e) => a + (e.kind === 'msg' ? words(e.label) : 1), 0)) / 2);
     default:
       return 0;
   }

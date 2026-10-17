@@ -165,6 +165,7 @@ Açılan **Galeri** kompozisyonu bütün animasyon türlerini örnek verilerle g
 | `EKRAN` | Çerçeveli ekran kaydı | `assets/screen-01.mp4` |
 | `HABER` | Sayfa görüntüsü + fosforlu kalem + yakınlaşma | Playwright otomatik çeker |
 | `BELGE` | PDF sayfası + vurgu | `assets/rapor.pdf` |
+| `ANİM: sistem` | Sistem tasarımı: rolüne göre ikonlu aktörler (insan, sunucu kasası, silindir veritabanı, robot ajan, tarayıcı…), oklarda akan mesaj paketleri, sonuç durumları (çöker, yavaşlar, kilitlenir, reddeder, sızdırır, kabul eder, cevap verir) | script'teki metin; ikon aktör adından (`src/shared/system-diagram.ts`) ya da `(rol)` |
 | `ANİM: map` | Dünyadan yere yakınlaşan tel kafes harita + işaret | yer adı → koordinat (OpenStreetMap, `build/harita.json`) ya da `konum:` |
 | `FOTO` | Ken Burns + isim/unvan | `assets/kisi.jpg` ya da Commons adayı (`ara:`) |
 | `KLİP` | Sessiz arşiv videosu + künye | Commons video adayı (`ara:`; ≤ 60 sn, ≤ 720p MP4'e çevrilir) ya da `assets/` |

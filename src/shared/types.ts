@@ -5,6 +5,7 @@ export type VideoFormat = 'talking-head' | 'tutorial';
 
 // İşaret türleri tek kaynaktan: marker-schema.ts (skill sözlüğü de oradan üretilir).
 import type {AnimType, MarkerKind} from './marker-schema';
+import type {SystemActor, SystemEvent} from './system-diagram';
 export type {AnimType, MarkerKind};
 
 export type LabeledText = {label?: string; text: string};
@@ -25,6 +26,7 @@ export type SceneProps =
   | {type: 'photo'; file: string; caption?: string; search?: string; provisional?: boolean}
   | {type: 'post'; platform: string; handle: string; text: string}
   | {type: 'map'; place: string; caption?: string; lat?: number; lon?: number}
+  | {type: 'system'; actors: SystemActor[]; events: SystemEvent[]}
   | {type: 'clip'; file: string; caption?: string; search?: string; provisional?: boolean; mediaDurationSec?: number}
   // Kameranın üstünde (yüz görünür kalır):
   | {type: 'lower'; name: string; title?: string}

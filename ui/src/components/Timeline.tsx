@@ -25,7 +25,7 @@ const TRACKS: {id: TrackId; label: string; types: string[]}[] = [
   {id: 'foto', label: 'Fotoğraf · Video', types: ['photo', 'clip']},
   {id: 'haber', label: 'Haber · Belge', types: ['news', 'document', 'post']},
   {id: 'ekran', label: 'Ekran kaydı', types: ['screen']},
-  {id: 'anim', label: 'Animasyon', types: ['flow', 'compare', 'table', 'timeline', 'stat', 'quote', 'concept', 'terminal', 'code', 'map']},
+  {id: 'anim', label: 'Animasyon', types: ['flow', 'compare', 'table', 'timeline', 'stat', 'quote', 'concept', 'terminal', 'code', 'map', 'system']},
   {id: 'ust', label: 'Kamera üstü', types: ['lower', 'emphasis']},
 ];
 const trackOf = (s: Scene): TrackId => TRACKS.find((t) => t.types.includes(s.props.type))?.id ?? 'anim';
@@ -56,6 +56,8 @@ const blockTitle = (s: Scene): string => {
       return `▶ ${(p.caption ?? p.file).split(/ · |,/)[0]}`;
     case 'map':
       return `⌖ ${p.place}`;
+    case 'system':
+      return `Sistem · ${p.actors.map((a) => a.name).join(' → ')}`;
     case 'lower':
       return `Alt bant · ${p.name}`;
     case 'emphasis':
