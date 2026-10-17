@@ -9,7 +9,8 @@ import {loadCandidateSet, loadRegistry, writeReviewPage, type CandidateSet, type
 import {lintScript, type LintResult} from './lint';
 import {parseScript, type ParsedScript} from './parse-script';
 import {killTree, spawnTracked} from './procs';
-import {buildTiming} from './timing';
+import {codeHash, dirSig, fileHash, fileSig, forgetStage, hashOf, isFresh, loadState, recordStage, type StageKey} from './state';
+import {buildTiming, timingUpToDate} from './timing';
 import {ffprobe, findBaseMedia, fmtTime, paths, pickScript, ROOT, SKILL} from './util';
 
 export type StageName = 'lint' | 'timing' | 'assets' | 'align' | 'render';
@@ -35,15 +36,112 @@ export const loadScript = (dir: string): {file: string; parsed: ParsedScript} =>
   return {file, parsed: parseScript(fs.readFileSync(file, 'utf8'))};
 };
 
+// ── Aşama girdileri ────────────────────────────────────────────────────────
+// Her aşamanın çıktısını belirleyen her şeyin özeti. Özet son başarılı çalıştırmadakiyle aynıysa aşama atlanır.
+
+const PIPELINE_CODE = ['src/pipeline/markers.ts', 'src/pipeline/parse-script.ts', 'src/pipeline/text.ts', 'src/shared'];
+const assetSig = (dir: string) => {
+  const p = paths(dir);
+  return [dirSig(p.assets), dirSig(p.buildAssets), dirSig(path.join(p.build, 'fotolar'), {skip: (r) => r === 'index.html'})];
+};
+const assetMarkers = (parsed: ParsedScript) => parsed.markers.filter((m) => ['news', 'document', 'photo', 'screen', 'code'].includes(m.props.type)).map((m) => m.props);
+
+export const stageInputs = {
+  lint: (dir: string) => hashOf(fileHash(pickScript(dir)), fileHash(SKILL), codeHash('src/pipeline/lint.ts', ...PIPELINE_CODE)),
+  assets: (dir: string, parsed: ParsedScript) => hashOf(assetMarkers(parsed), assetSig(dir), codeHash('src/pipeline/assets.ts', 'src/pipeline/commons.ts')),
+  align: (dir: string) => {
+    const p = paths(dir);
+    let base: string | null = null;
+    try {
+      base = fileSig(findBaseMedia(dir).file);
+    } catch {
+      /* kayıt yok */
+    }
+    return hashOf(
+      fileHash(pickScript(dir)),
+      fileHash(p.transcript),
+      base,
+      fileHash(path.join(p.build, 'edits.json')),
+      fileHash(path.join(p.assets, 'kaynaklar.json')),
+      assetSig(dir),
+      codeHash('src/pipeline/align.ts', 'src/pipeline/edits.ts', 'src/pipeline/commons.ts', ...PIPELINE_CODE),
+    );
+  },
+  /** Render: sahneler (oluşturulma zamanı hariç) + varlıklar + kurgu kaydı + Remotion/marka kodu + seçenekler. */
+  render: (dir: string, opts: {overlay?: boolean; includeSuggested?: boolean} = {}) => {
+    const p = paths(dir);
+    let scenes: unknown = null;
+    try {
+      const {generatedAt: _g, ...rest} = JSON.parse(fs.readFileSync(p.scenes, 'utf8'));
+      scenes = rest;
+    } catch {
+      /* hizalama yok */
+    }
+    let base: string | null = null;
+    try {
+      base = fileSig(findBaseMedia(dir).file);
+    } catch {
+      /* kayıt yok */
+    }
+    return hashOf(scenes, base, assetSig(dir), {overlay: Boolean(opts.overlay), includeSuggested: opts.includeSuggested ?? true}, codeHash('src/remotion', 'brand', 'src/shared'));
+  },
+};
+
+const renderKey = (overlay?: boolean): StageKey => (overlay ? 'render-overlay' : 'render');
+
+export type Freshness = 'güncel' | 'değişti' | 'yok';
+/** Arayüz için: her aşamanın son çalışması şimdiki girdilere göre güncel mi. */
+export const stageFreshness = (dir: string): Record<StageName, {state: Freshness; at?: string; detail?: string}> => {
+  const st = loadState(dir).stages;
+  const of = (k: StageKey, hash: () => string | null) => {
+    const r = st[k];
+    if (!r) return {state: 'yok' as Freshness};
+    let h: string | null = null;
+    try {
+      h = hash();
+    } catch {
+      /* girdi eksik */
+    }
+    return {state: (r.ok !== false && h === r.hash ? 'güncel' : 'değişti') as Freshness, at: r.at, detail: r.detail};
+  };
+  let parsed: ParsedScript | null = null;
+  try {
+    parsed = loadScript(dir).parsed;
+  } catch {
+    /* script yok */
+  }
+  const timingRec = st.timing;
+  return {
+    lint: of('lint', () => stageInputs.lint(dir)),
+    timing: timingRec ? {state: timingUpToDate(dir) ? 'güncel' : 'değişti', at: timingRec.at, detail: timingRec.detail} : {state: 'yok'},
+    assets: of('assets', () => (parsed ? stageInputs.assets(dir, parsed) : null)),
+    align: of('align', () => stageInputs.align(dir)),
+    render: of('render', () => stageInputs.render(dir)),
+  };
+};
+
+/** Tam video son render'dan beri değişmedi mi. Kaydı olmayan eski projelerde dosya zamanına bakılır. */
+export const renderUpToDate = (dir: string): boolean => {
+  const p = paths(dir);
+  const out = path.join(p.out, 'video.mp4');
+  if (!fs.existsSync(out)) return false;
+  const rec = loadState(dir).stages.render;
+  if (!rec) return fs.existsSync(p.scenes) && fs.statSync(out).mtimeMs >= fs.statSync(p.scenes).mtimeMs;
+  return isFresh(dir, 'render', stageInputs.render(dir));
+};
+
 export const stageLint = (dir: string, emit: Emit): LintStage => {
   emit({type: 'stage', stage: 'lint', status: 'start'});
+  const hash = stageInputs.lint(dir);
   const {file, parsed} = loadScript(dir);
   const res = lintScript(parsed, {skillPath: SKILL});
   fs.mkdirSync(paths(dir).build, {recursive: true});
   fs.writeFileSync(path.join(paths(dir).build, 'lint.json'), JSON.stringify({file: path.basename(file), ...res}, null, 1));
   const errs = res.issues.filter((i) => i.level === 'hata').length;
   const warns = res.issues.filter((i) => i.level === 'uyarı').length;
-  emit({type: 'stage', stage: 'lint', status: 'done', detail: `${res.stats['işaret']} işaret · ${errs} hata · ${warns} uyarı`});
+  const detail = `${res.stats['işaret']} işaret · ${errs} hata · ${warns} uyarı`;
+  recordStage(dir, 'lint', {hash, detail, ok: true});
+  emit({type: 'stage', stage: 'lint', status: 'done', detail});
   return {file, parsed, res};
 };
 
@@ -52,6 +150,7 @@ export const stageTiming = (dir: string, emit: Emit, force = false) => {
   emit({type: 'stage', stage: 'timing', status: 'start'});
   try {
     const r = buildTiming(dir, {force});
+    recordStage(dir, 'timing', {hash: fileHash(paths(dir).transcript) ?? '', detail: r.detail, ok: true});
     emit({type: 'stage', stage: 'timing', status: r.status === 'güncel' ? 'skip' : 'done', detail: r.detail});
     return r;
   } catch (e: any) {
@@ -60,21 +159,42 @@ export const stageTiming = (dir: string, emit: Emit, force = false) => {
   }
 };
 
-export const stageAssets = async (dir: string, parsed: ParsedScript, emit: Emit, force = false): Promise<AssetResult[]> => {
+const assetResultsFile = (dir: string) => path.join(paths(dir).build, 'varliklar.json');
+
+export const stageAssets = async (dir: string, parsed: ParsedScript, emit: Emit, force = false): Promise<AssetResult[] | null> => {
   emit({type: 'stage', stage: 'assets', status: 'start'});
+  // Girdiler değişmediyse ve son çalışmada eksik kalmadıysa tarayıcı/ağ hiç açılmaz.
+  if (!force && isFresh(dir, 'assets', stageInputs.assets(dir, parsed))) {
+    emit({type: 'stage', stage: 'assets', status: 'skip', detail: `değişmedi · ${loadState(dir).stages.assets?.detail ?? ''}`});
+    try {
+      return JSON.parse(fs.readFileSync(assetResultsFile(dir), 'utf8'));
+    } catch {
+      return null;
+    }
+  }
   const results = await collectAssets(dir, parsed, {force});
   writeReviewPage(dir, path.basename(dir));
   const missing = results.filter((r) => r.status === 'eksik').length;
   const pending = photoStatus(dir, parsed).filter((p) => p.state === 'bekliyor').length;
-  emit({type: 'stage', stage: 'assets', status: 'done', detail: `${results.length} varlık · ${missing} eksik · ${pending} fotoğraf seçim bekliyor`});
+  const detail = `${results.length} varlık · ${missing} eksik · ${pending} fotoğraf seçim bekliyor`;
+  // Eksik varlık kaldıysa bir sonraki çalıştırmada yeniden denensin (ağ hatası, sonradan konan dosya).
+  fs.writeFileSync(assetResultsFile(dir), JSON.stringify(results, null, 1));
+  recordStage(dir, 'assets', {hash: stageInputs.assets(dir, parsed), detail, ok: missing === 0});
+  emit({type: 'stage', stage: 'assets', status: 'done', detail});
   return results;
 };
 
-export const stageAlign = (dir: string, emit: Emit): ScenesFile => {
+export const stageAlign = (dir: string, emit: Emit, opts: {force?: boolean} = {}): ScenesFile => {
   emit({type: 'stage', stage: 'align', status: 'start'});
   const p = paths(dir);
-  const {file, parsed} = loadScript(dir);
   if (!fs.existsSync(p.transcript)) throw new Error('Zamanlama yok; önce zamanlama aşaması çalışmalı');
+  const hash = stageInputs.align(dir);
+  if (!opts.force && fs.existsSync(p.scenes) && isFresh(dir, 'align', hash)) {
+    const scenes: ScenesFile = JSON.parse(fs.readFileSync(p.scenes, 'utf8'));
+    emit({type: 'stage', stage: 'align', status: 'skip', detail: `değişmedi · ${scenes.scenes.length} sahne`});
+    return scenes;
+  }
+  const {file, parsed} = loadScript(dir);
   const t: Transcript = JSON.parse(fs.readFileSync(p.transcript, 'utf8'));
   const base = findBaseMedia(dir);
   const probe = ffprobe(base.file);
@@ -82,7 +202,10 @@ export const stageAlign = (dir: string, emit: Emit): ScenesFile => {
   fs.writeFileSync(p.scenes, JSON.stringify(scenes, null, 1));
   fs.mkdirSync(p.out, {recursive: true});
   fs.writeFileSync(path.join(p.out, 'bolumler.txt'), scenes.chapters.map((ch) => `${fmtTime(ch.startSec)} ${ch.title}`).join('\n') + '\n');
-  emit({type: 'stage', stage: 'align', status: 'done', detail: `${scenes.scenes.length} sahne · ${scenes.dropped.length} düşen`});
+  const detail = `${scenes.scenes.length} sahne · ${scenes.dropped.length} düşen`;
+  // Özet, hizalamanın kendi yazdığı dosyalar (edits taşıması) sonrasında alınır.
+  recordStage(dir, 'align', {hash: stageInputs.align(dir), detail, ok: true});
+  emit({type: 'stage', stage: 'align', status: 'done', detail});
   return scenes;
 };
 
@@ -98,8 +221,8 @@ export const stagePrepare = async (dir: string, emit: Emit, opts: {force?: boole
   checkAbort(opts.signal);
   const assets = await stageAssets(dir, lint.parsed, emit, opts.force);
   checkAbort(opts.signal);
-  const scenes = stageAlign(dir, emit);
-  writeReport(dir, {lint, assets, scenes});
+  const scenes = stageAlign(dir, emit, {force: opts.force});
+  writeReport(dir, {lint, assets: assets ?? undefined, scenes});
   return {lint, assets, scenes, photos: photoStatus(dir, lint.parsed)};
 };
 
@@ -137,7 +260,7 @@ export const photoStatus = (dir: string, parsed: ParsedScript): PhotoStatus[] =>
 
 // ── Render ─────────────────────────────────────────────────────────────────
 
-export type RenderOptions = {overlay?: boolean; includeSuggested?: boolean; frames?: string; signal?: AbortSignal};
+export type RenderOptions = {overlay?: boolean; includeSuggested?: boolean; frames?: string; force?: boolean; signal?: AbortSignal};
 
 /**
  * Render kendi süreç grubunda ve kendi geçici klasöründe çalışır (TMPDIR = build/.render-tmp-*).
@@ -153,6 +276,13 @@ export const stageRender = (dir: string, emit: Emit, opts: RenderOptions = {}): 
     emit({type: 'stage', stage: 'render', status: 'start'});
     fs.mkdirSync(p.out, {recursive: true});
     const out = path.join(p.out, opts.overlay ? 'gorsel-katmani.mov' : 'video.mp4');
+    // Son tam render'dan beri hiçbir girdi değişmediyse aynı dosyayı yeniden üretme.
+    const key = renderKey(opts.overlay);
+    const hash = stageInputs.render(dir, opts);
+    if (!opts.frames && !opts.force && fs.existsSync(out) && isFresh(dir, key, hash)) {
+      emit({type: 'stage', stage: 'render', status: 'skip', detail: `değişmedi · ${path.basename(out)} güncel`});
+      return resolve(out);
+    }
     const propsFile = path.join(p.build, 'render-props.json');
     fs.writeFileSync(propsFile, JSON.stringify({scenesFile: 'build/scenes.json', includeSuggested: opts.includeSuggested ?? true, overlayOnly: Boolean(opts.overlay)}));
     const args = ['remotion', 'render', 'src/remotion/index.ts', 'Video', out, '--public-dir', dir, '--props', propsFile, '--log=info'];
@@ -209,7 +339,11 @@ export const stageRender = (dir: string, emit: Emit, opts: RenderOptions = {}): 
       }
       cleanup(true);
       const mb = (fs.statSync(out).size / 1e6).toFixed(1);
-      emit({type: 'stage', stage: 'render', status: 'done', detail: `${path.basename(out)} · ${mb} MB`});
+      const detail = `${path.basename(out)} · ${mb} MB · ${Math.round((Date.now() - startedAt) / 1000)} sn`;
+      // Kısmi (kare aralığı) render tam videonun yerine sayılmaz.
+      if (!opts.frames) recordStage(dir, key, {hash, detail, ok: true});
+      else forgetStage(dir, key);
+      emit({type: 'stage', stage: 'render', status: 'done', detail});
       resolve(out);
     });
   });

@@ -5,7 +5,8 @@ import path from 'node:path';
 import type {SceneProps} from '../shared/types';
 
 export const ROOT = path.resolve(import.meta.dirname, '../..');
-export const VIDEOS = path.join(ROOT, 'videos');
+// YTE_VIDEOS: projeler başka bir klasörden okunsun (testler ve deneme sunucusu kullanıcının projelerine dokunmasın).
+export const VIDEOS = process.env.YTE_VIDEOS ? path.resolve(process.env.YTE_VIDEOS) : path.join(ROOT, 'videos');
 export const SKILL = path.join(ROOT, '.claude/skills/youtube-script-writer/SKILL.md');
 export const PY = path.join(ROOT, '.venv/bin/python');
 

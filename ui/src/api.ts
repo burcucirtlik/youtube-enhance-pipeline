@@ -1,6 +1,6 @@
 // Sunucu API'si (server/index.ts) için ince istemci.
 
-import type {PhotoStatus, RunEvent, StageName} from '../../src/pipeline/run';
+import type {Freshness, PhotoStatus, RunEvent, StageName} from '../../src/pipeline/run';
 import type {Scene, ScenesFile} from '../../src/shared/types';
 
 export type Status = 'yeni' | 'işleniyor' | 'foto-seçimi' | 'hazır' | 'render' | 'bitti' | 'hata';
@@ -32,6 +32,8 @@ export type ProjectDetail = ProjectSummary & {
   photos: PhotoStatus[];
   report: string | null;
   stages: {name: StageName; label: string}[];
+  freshness: Record<StageName, {state: Freshness; at?: string; detail?: string}>;
+  lastJob: {kind: string; startedAt: string; endedAt: string; error: string | null; log: string} | null;
   files: {video: string | null; base: string | null};
 };
 
@@ -50,7 +52,8 @@ export const api = {
   photos: (id: string, selections: Record<string, number[]>) => fetch(`/api/projects/${id}/photos`, json('POST', {selections})).then(j<ProjectDetail & {results: Record<string, string>}>),
   saveScenes: (id: string, scenes: Pick<Scene, 'markerId' | 'startSec' | 'endSec' | 'disabled'>[]) => fetch(`/api/projects/${id}/scenes`, json('PUT', {scenes})).then(j<{edits: number; scenes: ScenesFile}>),
   resetEdits: (id: string) => fetch(`/api/projects/${id}/edits`, json('DELETE')).then(j<{scenes: ScenesFile}>),
-  render: (id: string, opts: {overlay?: boolean; frames?: string} = {}) => fetch(`/api/projects/${id}/render`, json('POST', opts)).then(j<ProjectSummary>),
+  lastLog: (id: string) => fetch(`/api/projects/${id}/logs/latest`).then(j<{name?: string; events: RunEvent[]}>),
+  render: (id: string, opts: {overlay?: boolean; frames?: string; force?: boolean} = {}) => fetch(`/api/projects/${id}/render`, json('POST', opts)).then(j<ProjectSummary>),
   remove: (id: string) => fetch(`/api/projects/${id}`, json('DELETE')).then(j<{ok: true}>),
   cancel: (id: string) => fetch(`/api/projects/${id}/cancel`, json('POST')).then(j<{ok: true}>),
   uploadFiles: (id: string, form: FormData) => fetch(`/api/projects/${id}/files`, {method: 'POST', body: form}).then(j<ProjectDetail>),

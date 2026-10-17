@@ -3,6 +3,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import {fileHash} from './state';
 import {findSubtitleFile, transcriptFromSubtitleFile} from './subtitles';
 import {paths} from './util';
 
@@ -16,7 +17,8 @@ export const timingUpToDate = (dir: string): boolean => {
   if (!sub || !fs.existsSync(p.transcript)) return false;
   try {
     const t = JSON.parse(fs.readFileSync(p.transcript, 'utf8'));
-    return t.source === path.basename(sub) && t.sourceMtime === fs.statSync(sub).mtimeMs;
+    // İçerik özetiyle: dosya kopyalanınca, git'ten çekilince ya da aynı içerikle yeniden yüklenince boşuna yenilenmez.
+    return t.source === path.basename(sub) && t.sourceHash === fileHash(sub);
   } catch {
     return false;
   }
@@ -38,6 +40,6 @@ export const buildTiming = (dir: string, opts: {force?: boolean} = {}): TimingRe
   if (!opts.force && timingUpToDate(dir)) return {status: 'güncel', detail: `${path.basename(sub)} değişmedi`};
   fs.mkdirSync(p.build, {recursive: true});
   const t = transcriptFromSubtitleFile(sub);
-  fs.writeFileSync(p.transcript, JSON.stringify({model: 'descript-subtitles', language: 'tr', ...t, source: path.basename(sub), sourceMtime: fs.statSync(sub).mtimeMs}));
+  fs.writeFileSync(p.transcript, JSON.stringify({model: 'descript-subtitles', language: 'tr', ...t, source: path.basename(sub), sourceHash: fileHash(sub)}));
   return {status: 'altyazı', detail: `${path.basename(sub)}: ${t.segments.length} satır, ${t.words.length} kelime`};
 };

@@ -42,6 +42,17 @@ export const Project: React.FC<{id: string}> = ({id}) => {
     return () => unsub.current?.();
   }, [load]);
 
+  // Çalışan iş yoksa diske kaydedilmiş son işin günlüğünü göster (uygulama yeniden açıldığında da).
+  const loadedLog = useRef(false);
+  useEffect(() => {
+    if (!d || loadedLog.current || d.status === 'işleniyor' || d.status === 'render') return;
+    loadedLog.current = true;
+    api
+      .lastLog(id)
+      .then((r) => setEvents((ev) => (ev.length ? ev : r.events)))
+      .catch(() => {});
+  }, [d, id]);
+
   // İlk yüklemede çalışan iş varsa akışa bağlan; sekmeyi duruma göre seç.
   useEffect(() => {
     if (!d) return;
@@ -164,7 +175,15 @@ export const Project: React.FC<{id: string}> = ({id}) => {
 
       {tab === 'islem' ? (
         <div>
-          <Stages stages={d.stages} events={events} running={running} error={jobError ?? d.error} />
+          <Stages stages={d.stages} events={events} running={running} error={jobError ?? d.error} freshness={d.freshness} />
+          {!running && (['lint', 'timing', 'assets', 'align'] as const).some((k) => d.freshness[k].state === 'değişti') && d.hasVideo && d.hasSubtitles ? (
+            <div className="card" style={{marginTop: 12}}>
+              <span className="warn">Script, altyazı ya da görseller son çalıştırmadan beri değişti.</span> Yalnızca değişen aşamalar yeniden çalışır.{' '}
+              <button className="primary small" onClick={() => prepare(false)}>
+                Güncelle
+              </button>
+            </div>
+          ) : null}
           {!running && d.status === 'foto-seçimi' ? (
             <div className="card" style={{marginTop: 12}}>
               {pendingPhotos} arşiv fotoğrafı seçim bekliyor.{' '}

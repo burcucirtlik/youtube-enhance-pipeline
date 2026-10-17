@@ -33,6 +33,8 @@ Akış:
 
 **Kaynaklar:** render kendi süreç grubunda ve proje içindeki geçici bir klasörde (`build/.render-tmp-*`) çalışır. Render bitince, iptal edilince ya da uygulama kapanınca bütün alt süreçler (Remotion, Chrome, ffmpeg) sonlandırılır, geçici klasör silinir, yarım kalan video kaldırılır. Uygulama çökerse sunucu bunu 2 sn içinde fark edip kendini kapatır.
 
+**Yalnızca değişen yeniden çalışır:** her aşama girdilerinin özetini `build/state.json`'a yazar (script, altyazı, görseller, editör düzenlemeleri, kurgu kaydının imzası, ilgili kod). Hiçbiri değişmediyse aşama atlanır (◌ "değişmedi"); render de öyle: hiçbir şey değişmediyse aynı videoyu yeniden üretmez. İşlem sekmesi son çalıştırmadan beri hangi aşamanın girdisinin değiştiğini **değişti** etiketiyle gösterir; **Güncelle** yalnızca onları çalıştırır. Bir işin günlüğü `build/logs/` altına kaydedilir (en yeni 15); uygulama kapanıp açıldığında son işin aşamaları ve hatası görünür. Zorla yeniden yapmak için CLI'da `--force`.
+
 Geliştirme: `npm run server` (API, :3030) ve `npm run ui:dev` (Vite, :5173). Tarayıcıda `http://localhost:5173`. Uygulama arayüzü `dist/ui` altına `npm run ui:build` ile derlenir; `npm run app` bunu kendisi yapar.
 
 ## Kurulum (bir kere)
@@ -166,6 +168,6 @@ videos/YYYY-MM-kisa-baslik/
   script.md, script.final.md
   footage/   kurgu kaydı
   assets/    elle konan malzeme
-  build/     transcript.json, scenes.json, rapor.md, üretilen varlıklar
+  build/     transcript.json, scenes.json, edits.json, state.json, logs/, rapor.md, üretilen varlıklar
   out/       video.mp4, gorsel-katmani.mov, bolumler.txt
 ```

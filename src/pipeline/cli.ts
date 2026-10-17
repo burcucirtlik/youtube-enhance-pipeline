@@ -4,12 +4,11 @@ import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type {ScenesFile} from '../shared/types';
-import {buildScenes, DEFAULT_ALIGN, type Transcript} from './align';
 import {collectAssets} from './assets';
 import {loadCandidateSet, loadRegistry, selectCandidate, writeReviewPage} from './commons';
 import {lintScript} from './lint';
 import {parseScript, type Issue} from './parse-script';
-import {writeReport} from './run';
+import {stageAlign, stageRender, writeReport, type Emit} from './run';
 import {buildTiming} from './timing';
 import {ffprobe, findBaseMedia, fmtTime, paths, pickScript, resolveVideoDir, ROOT, SKILL, VIDEOS} from './util';
 
@@ -117,16 +116,11 @@ const cmdAssets = async (dir: string) => {
 
 const cmdAlign = (dir: string) => {
   const p = paths(dir);
-  const {file, parsed} = loadScript(dir);
   if (!fs.existsSync(p.transcript)) throw new Error('Zamanlama yok. Önce: npm run timing -- ' + path.relative(ROOT, dir));
-  const t: Transcript = JSON.parse(fs.readFileSync(p.transcript, 'utf8'));
-  const base = findBaseMedia(dir);
-  const probe = ffprobe(base.file);
-  const scenes = buildScenes(dir, file, parsed, t, {...base, probe}, {...DEFAULT_ALIGN, includeSuggested: !flags.has('--onerisiz')});
-  fs.writeFileSync(p.scenes, JSON.stringify(scenes, null, 1));
-  fs.mkdirSync(p.out, {recursive: true});
-  fs.writeFileSync(path.join(p.out, 'bolumler.txt'), scenes.chapters.map((ch) => `${fmtTime(ch.startSec)} ${ch.title}`).join('\n') + '\n');
-  console.log(c.bold(`\n⏱  Hizalama: ${path.relative(ROOT, file)} ↔ ${path.basename(base.file)}`));
+  console.log(c.bold(`\n⏱  Hizalama: ${path.relative(ROOT, pickScript(dir))} ↔ ${path.basename(findBaseMedia(dir).file)}`));
+  let skipped = false;
+  const scenes = stageAlign(dir, (e) => e.type === 'stage' && e.status === 'skip' && (skipped = true), {force: flags.has('--force')});
+  if (skipped) console.log(c.dim('  girdiler değişmedi; yeniden yapmak için --force'));
   console.log(`  ${c.green(String(scenes.scenes.length))} sahne · ${scenes.dropped.length ? c.yellow(String(scenes.dropped.length)) : 0} düşen · ${scenes.chapters.length} bölüm işareti`);
   for (const d of scenes.dropped) console.log(`  ${c.yellow('düşen')} ${c.dim(`satır ${d.line}`)}  ${d.reason}`);
   for (const w of scenes.warnings) console.log(`  ${c.yellow('uyarı')} ${w}`);
@@ -177,26 +171,27 @@ const cmdStudio = (dir: string | null) => {
   remotion(['studio', 'src/remotion/index.ts', '--public-dir', dir]);
 };
 
-const cmdRender = (dir: string) => {
+/** Uygulamayla aynı render aşaması: girdiler değişmediyse atlanır, geçici dosyalar temizlenir. */
+const cmdRender = async (dir: string) => {
   const p = paths(dir);
   if (!fs.existsSync(p.scenes)) throw new Error('build/scenes.json yok. Önce: npm run align -- ' + path.relative(ROOT, dir));
   const overlay = flags.has('--katman') || flags.has('--overlay');
   const includeSuggested = flags.has('--oneriler');
   const data: ScenesFile = JSON.parse(fs.readFileSync(p.scenes, 'utf8'));
-  const pending = data.scenes.filter((s) => s.suggested).length;
+  const pending = data.scenes.filter((s) => s.suggested && !s.disabled).length;
   if (pending && !includeSuggested) console.log(c.yellow(`  ${pending} önerilen (?) işaret render'a girmiyor. Tutulacaksa script'te ?'yi sil ya da --oneriler ekle.`));
   const missing = data.scenes.filter((s) => s.missingAsset && (includeSuggested || !s.suggested)).length;
   if (missing) console.log(c.yellow(`  ${missing} sahnede varlık eksik; yer tutucu çizilecek.`));
-  fs.mkdirSync(p.out, {recursive: true});
-  const out = path.join(p.out, overlay ? 'gorsel-katmani.mov' : 'video.mp4');
-  const propsFile = path.join(p.build, 'render-props.json');
-  fs.writeFileSync(propsFile, JSON.stringify({scenesFile: 'build/scenes.json', includeSuggested, overlayOnly: overlay}));
-  const args = ['render', 'src/remotion/index.ts', 'Video', out, '--public-dir', dir, '--props', propsFile];
-  if (overlay) args.push('--codec', 'prores', '--prores-profile', '4444', '--pixel-format', 'yuva444p10le', '--image-format', 'png');
-  const frames = flagVal('--kareler');
-  if (frames) args.push('--frames', frames);
-  console.log(c.bold(`\n🎬 Render → ${path.relative(ROOT, out)}`));
-  remotion(args);
+  console.log(c.bold(`\n🎬 Render`));
+  const out = await stageRender(dir, consoleEmit, {overlay, includeSuggested, frames: flagVal('--kareler'), force: flags.has('--force')});
+  console.log(c.green(`  ✓ ${path.relative(ROOT, out)}`));
+};
+
+/** Aşama olaylarını terminale yazar; ilerleme tek satırda güncellenir. */
+const consoleEmit: Emit = (e) => {
+  if (e.type === 'progress') process.stdout.write(`\r  ${Math.round(e.ratio * 100)}% ${e.text ?? ''}`.padEnd(48));
+  else if (e.type === 'stage' && e.status !== 'start') console.log(`\r  ${e.status === 'error' ? c.red('✗') : e.status === 'skip' ? c.dim('◌') : c.green('●')} ${e.detail ?? ''}`.padEnd(48));
+  else if (e.type === 'log' && flags.has('--ayrinti')) console.log(c.dim(`  ${e.text}`));
 };
 
 const HELP = `
@@ -205,11 +200,11 @@ Zena'nın video pipeline'ı
   npm run new -- 2026-10-kisa-baslik [--egitim]   yeni video klasörü
   npm run lint -- <klasör>                         script kontrolü (işaret sözlüğü + kalite listesi)
   npm run timing -- <klasör> [--force]             Descript altyazısından (footage/kurgu.srt) kelime zamanları
-  npm run assets -- <klasör> [--force]             haber ekran görüntüsü, PDF vurgusu, arşiv fotoğrafı adayları, illüstrasyon, eksik listesi
+  npm run assets -- <klasör> [--force]             haber ekran görüntüsü, PDF vurgusu, arşiv fotoğrafı adayları, eksik listesi
   npm run foto -- <klasör> [<dosya.jpg> <no>]      arşiv fotoğrafı adaylarını listele / birini seç
-  npm run align -- <klasör> [--onerisiz]           işaretleri sese hizalar → build/scenes.json
+  npm run align -- <klasör> [--force]              işaretleri sese hizalar → build/scenes.json (girdiler değişmediyse atlar)
   npm run studio -- [<klasör>]                     Remotion Studio önizleme (klasörsüz: bileşen galerisi)
-  npm run render -- <klasör> [--oneriler] [--katman] [--kareler 0-299]
+  npm run render -- <klasör> [--oneriler] [--katman] [--kareler 0-299] [--force] [--ayrinti]
   npm run pipeline -- <klasör> [--render]          lint → zamanlama → assets → align (→ render)
 
 <klasör>: videos/2026-10-kisa-baslik ya da sadece 2026-10-kisa-baslik
@@ -243,7 +238,7 @@ const main = async () => {
     case 'studio':
       return cmdStudio(target && !target.startsWith('--') ? resolveVideoDir(target) : null);
     case 'render':
-      return cmdRender(resolveVideoDir(target));
+      return await cmdRender(resolveVideoDir(target));
     case 'all': {
       const dir = resolveVideoDir(target);
       const lint = cmdLint(dir);
@@ -252,7 +247,7 @@ const main = async () => {
       const assets = await cmdAssets(dir);
       const scenes = cmdAlign(dir);
       writeReport(dir, {lint, assets, scenes});
-      if (flags.has('--render')) cmdRender(dir);
+      if (flags.has('--render')) await cmdRender(dir);
       else console.log(c.dim(`\n  Önizleme: npm run studio -- ${path.relative(ROOT, dir)}\n  Render:   npm run render -- ${path.relative(ROOT, dir)}`));
       return;
     }

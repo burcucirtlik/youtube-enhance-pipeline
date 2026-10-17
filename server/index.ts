@@ -10,7 +10,8 @@ import {killAll, liveProcesses} from '../src/pipeline/procs';
 import {findSubtitleFile} from '../src/pipeline/subtitles';
 import {editsFromScenes, loadEdits, saveEdits} from '../src/pipeline/edits';
 import {parseScript} from '../src/pipeline/parse-script';
-import {loadScript, photoStatus, stageAlign, stagePrepare, stageRender, STAGES, type RunEvent, type StageName} from '../src/pipeline/run';
+import {loadScript, photoStatus, renderUpToDate, stageAlign, stageFreshness, stagePrepare, stageRender, STAGES, type RunEvent, type StageName} from '../src/pipeline/run';
+import {listJobLogs, loadState, readJobLog, saveJobLog} from '../src/pipeline/state';
 import {ffprobe, findBaseMedia, paths, ROOT, VIDEOS} from '../src/pipeline/util';
 import type {Scene, ScenesFile} from '../src/shared/types';
 
@@ -73,11 +74,17 @@ const summarize = (id: string) => {
   const pendingPhotos = photos.filter((x) => x.state === 'bekliyor').length;
   let status: Status = 'yeni';
   let stage: StageName | null = null;
+  // Son işin hatası sunucu yeniden başlasa da görünür (build/state.json); sonrasında bir aşama başarıyla
+  // çalıştıysa (ör. editörden hizalama) hata eskimiş sayılır.
+  const state = loadState(dir);
+  const lastAt = Math.max(0, ...Object.values(state.stages).map((r) => Date.parse(r!.at)));
+  const lastError =
+    job && !job.done ? undefined : state.lastJob?.error && Date.parse(state.lastJob.endedAt) >= lastAt ? state.lastJob.error : job?.error && !state.lastJob ? job.error : undefined;
   if (job && !job.done) {
     status = job.kind === 'render' ? 'render' : 'işleniyor';
     stage = [...job.events].reverse().find((e): e is Extract<RunEvent, {type: 'stage'}> => e.type === 'stage')?.stage ?? null;
-  } else if (job?.error) status = 'hata';
-  else if (hasOut && scenes && fs.statSync(outFile).mtimeMs >= fs.statSync(p.scenes).mtimeMs) status = 'bitti';
+  } else if (lastError) status = 'hata';
+  else if (hasOut && scenes && renderUpToDate(dir)) status = 'bitti';
   else if (scenes && pendingPhotos) status = 'foto-seçimi';
   else if (scenes) status = 'hazır';
   let hasVideo = false;
@@ -91,7 +98,7 @@ const summarize = (id: string) => {
     ...meta,
     status,
     stage,
-    error: job?.error,
+    error: lastError ?? undefined,
     hasScript,
     hasVideo,
     hasSubtitles: Boolean(findSubtitleFile(dir)),
@@ -124,6 +131,8 @@ const detail = (id: string) => {
     photos,
     report: fs.existsSync(p.report) ? fs.readFileSync(p.report, 'utf8') : null,
     stages: STAGES,
+    freshness: stageFreshness(dir),
+    lastJob: loadState(dir).lastJob ?? null,
     files: {video: summary.hasOut ? `/files/${id}/out/video.mp4` : null, base: baseUrl(id)},
   };
 };
@@ -167,6 +176,12 @@ const startJob = (id: string, kind: Job['kind'], work: (emit: (e: RunEvent) => v
     })
     .finally(() => {
       job.done = true;
+      // Günlük diske: uygulama kapanıp açılınca da son işin aşamaları ve hatası görünür.
+      try {
+        saveJobLog(path.join(VIDEOS, id), {kind, startedAt: job.startedAt, error: job.error ?? null, events: job.events});
+      } catch (e) {
+        console.error('Günlük yazılamadı', e);
+      }
       const end = `event: end\ndata: ${JSON.stringify({error: job.error ?? null})}\n\n`;
       for (const c of job.clients) {
         c.write(end);
@@ -355,7 +370,9 @@ app.delete('/api/projects/:id/edits', (req, res) => {
 
 app.post('/api/projects/:id/render', (req, res) => {
   const dir = projectDir(req.params.id);
-  startJob(req.params.id, 'render', (emit, signal) => stageRender(dir, emit, {overlay: Boolean(req.body?.overlay), includeSuggested: true, frames: req.body?.frames, signal}));
+  startJob(req.params.id, 'render', (emit, signal) =>
+    stageRender(dir, emit, {overlay: Boolean(req.body?.overlay), includeSuggested: true, frames: req.body?.frames, force: Boolean(req.body?.force), signal}),
+  );
   res.json(summarize(req.params.id));
 });
 
@@ -365,6 +382,22 @@ app.post('/api/projects/:id/cancel', (req, res) => {
   if (!job || job.done) throw httpError(409, 'Çalışan iş yok');
   job.abort.abort();
   res.json({ok: true});
+});
+
+/** Kayıtlı iş günlükleri (en yeni önce); `latest` en son işin olaylarını döndürür. */
+app.get('/api/projects/:id/logs', (req, res) => {
+  const dir = projectDir(req.params.id);
+  res.json({logs: listJobLogs(dir), lastJob: loadState(dir).lastJob ?? null});
+});
+app.get('/api/projects/:id/logs/:name', (req, res) => {
+  const dir = projectDir(req.params.id);
+  const name = req.params.name === 'latest' ? loadState(dir).lastJob?.log : req.params.name;
+  if (!name) return res.json({events: []});
+  try {
+    res.json({name, events: readJobLog(dir, name)});
+  } catch (e: any) {
+    throw httpError(400, e.message);
+  }
 });
 
 app.get('/api/processes', (_req, res) => res.json(liveProcesses()));
