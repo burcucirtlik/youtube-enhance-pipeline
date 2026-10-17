@@ -23,7 +23,8 @@
     "app:dev": "electron .",
     "icon": "tsx scripts/make-icon.ts",
     "launcher": "bash scripts/make-launcher.sh",
-    "timing": "tsx src/pipeline/cli.ts timing"
+    "timing": "tsx src/pipeline/cli.ts timing",
+    "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@remotion/bundler": "^4.0.536",
