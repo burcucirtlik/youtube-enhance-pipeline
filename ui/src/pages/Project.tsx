@@ -176,7 +176,7 @@ export const Project: React.FC<{id: string}> = ({id}) => {
       {tab === 'islem' ? (
         <div>
           <Stages stages={d.stages} events={events} running={running} error={jobError ?? d.error} freshness={d.freshness} />
-          {!running && (['lint', 'timing', 'assets', 'align'] as const).some((k) => d.freshness[k].state === 'değişti') && d.hasVideo && d.hasSubtitles ? (
+          {!running && (['lint', 'timing', 'assets', 'align'] as const).some((k) => d.freshness?.[k]?.state === 'değişti') && d.hasVideo && d.hasSubtitles ? (
             <div className="card" style={{marginTop: 12}}>
               <span className="warn">Script, altyazı ya da görseller son çalıştırmadan beri değişti.</span> Yalnızca değişen aşamalar yeniden çalışır.{' '}
               <button className="primary small" onClick={() => prepare(false)}>
