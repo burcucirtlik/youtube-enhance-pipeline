@@ -12,6 +12,7 @@ import {editsFromScenes, loadEdits, saveEdits} from '../src/pipeline/edits';
 import {parseScript} from '../src/pipeline/parse-script';
 import {loadScript, photoStatus, renderUpToDate, stageAlign, stageFreshness, stagePrepare, stageRender, STAGES, type RunEvent, type StageName} from '../src/pipeline/run';
 import {listJobLogs, loadState, readJobLog, saveJobLog} from '../src/pipeline/state';
+import {cleanupPlan, diskUsage, gcMedia, ingestAll, ingestProject, runCleanup, type DiskUsage} from '../src/pipeline/media';
 import {ffprobe, findBaseMedia, paths, ROOT, VIDEOS} from '../src/pipeline/util';
 import type {Scene, ScenesFile} from '../src/shared/types';
 
@@ -21,7 +22,7 @@ app.use(express.json({limit: '20mb'}));
 
 // ── Proje modeli ───────────────────────────────────────────────────────────
 
-type ProjectMeta = {id: string; title: string; createdAt: string; updatedAt?: string};
+type ProjectMeta = {id: string; title: string; createdAt: string; updatedAt?: string; archived?: boolean};
 type Job = {kind: 'prepare' | 'render'; startedAt: string; events: RunEvent[]; done: boolean; error?: string; clients: Set<Response>; abort: AbortController};
 const MAX_LOG_EVENTS = 400;
 const jobs = new Map<string, Job>();
@@ -53,6 +54,22 @@ const httpError = (status: number, message: string) => Object.assign(new Error(m
 const readJson = <T,>(f: string): T | null => (fs.existsSync(f) ? (JSON.parse(fs.readFileSync(f, 'utf8')) as T) : null);
 
 type Status = 'yeni' | 'işleniyor' | 'foto-seçimi' | 'hazır' | 'render' | 'bitti' | 'hata';
+
+/** Disk kullanımı dosya ağacını gezer; liste 4 sn'de bir yenilendiği için 15 sn önbellekte tutulur. */
+const diskCache = new Map<string, {at: number; value: DiskUsage}>();
+const disk = (id: string, fresh = false): DiskUsage => {
+  const hit = diskCache.get(id);
+  if (!fresh && hit && Date.now() - hit.at < 15_000) return hit.value;
+  const value = diskUsage(path.join(VIDEOS, id));
+  diskCache.set(id, {at: Date.now(), value});
+  return value;
+};
+
+/** Yüklenen kurgu kaydını ortak medya deposuna al (arka planda; aynısı varsa diskte bir kez kalır). */
+const ingestLater = (dir: string) =>
+  ingestProject(dir)
+    .then((r) => r.filter((x) => x.state === 'ortak').forEach((x) => console.log(`medya deposu: ${path.basename(dir)} başka projeyle aynı kayıt, birleştirildi (${(x.bytes / 1e6).toFixed(0)} MB)`)))
+    .catch((e) => console.error('medya deposu:', e.message));
 
 const summarize = (id: string) => {
   const dir = path.join(VIDEOS, id);
@@ -109,6 +126,7 @@ const summarize = (id: string) => {
     durationSec: scenes?.base.durationSec ?? null,
     sceneCount: scenes ? scenes.scenes.filter((s) => !s.disabled).length : 0,
     pendingPhotos,
+    disk: disk(id),
   };
 };
 
@@ -290,6 +308,7 @@ const createProject = (req: Request, res: Response) => {
   // Descript altyazısı (SRT/VTT): pipeline'ın tek zamanlama kaynağı.
   if (subtitles) placeSubtitles(dir, subtitles);
   writeMeta(dir, {id, title, createdAt: new Date().toISOString()});
+  if (video) ingestLater(dir);
   if (video && subtitles && req.body.autostart !== 'false') startJob(id, 'prepare', (emit, signal) => stagePrepare(dir, emit, {signal}));
   res.status(201).json(detail(id));
 };
@@ -310,6 +329,8 @@ app.post('/api/projects/:id/files', upload.fields([{name: 'video', maxCount: 1},
     if (video) {
       for (const n of fs.readdirSync(p.footage)) if (/^kurgu\.(mp4|mov|m4v|mkv|webm|wav|mp3|m4a|aac|flac)$/i.test(n)) fs.rmSync(path.join(p.footage, n));
       fs.renameSync(video.path, path.join(p.footage, `kurgu${path.extname(video.originalname).toLowerCase() || '.mp4'}`));
+      ingestLater(dir);
+      gcMedia(); // eski kaydı başka proje kullanmıyorsa depodan da kalksın
     }
     if (script) {
       const text = fs.readFileSync(script.path, 'utf8');
@@ -402,6 +423,30 @@ app.get('/api/projects/:id/logs/:name', (req, res) => {
   }
 });
 
+/** Temizlik önizlemesi: silinecek yeniden üretilebilir dosyalar ve disk kullanımı. */
+app.get('/api/projects/:id/cleanup', (req, res) => {
+  const dir = projectDir(req.params.id);
+  res.json({items: cleanupPlan(dir), disk: disk(req.params.id, true)});
+});
+app.post('/api/projects/:id/cleanup', (req, res) => {
+  const dir = projectDir(req.params.id);
+  const job = jobs.get(req.params.id);
+  if (job && !job.done) throw httpError(409, 'İş çalışırken temizlenemez');
+  const r = runCleanup(dir);
+  res.json({...r, disk: disk(req.params.id, true)});
+});
+
+/** Arşivle: proje listede alta iner, yeniden üretilebilir dosyaları silinir. Geri alınabilir (dosyalar yeniden üretilir). */
+app.post('/api/projects/:id/archive', (req, res) => {
+  const dir = projectDir(req.params.id);
+  const job = jobs.get(req.params.id);
+  if (job && !job.done) throw httpError(409, 'İş çalışırken arşivlenemez');
+  const archived = req.body?.archived !== false;
+  const freed = archived ? runCleanup(dir).bytes : 0;
+  writeMeta(dir, {...readMeta(req.params.id), archived});
+  res.json({...summarize(req.params.id), disk: disk(req.params.id, true), freed});
+});
+
 app.get('/api/processes', (_req, res) => res.json(liveProcesses()));
 
 app.delete('/api/projects/:id', (req, res) => {
@@ -410,7 +455,10 @@ app.delete('/api/projects/:id', (req, res) => {
   if (job && !job.done) throw httpError(409, 'İş çalışırken proje silinemez');
   fs.rmSync(dir, {recursive: true, force: true});
   jobs.delete(req.params.id);
-  res.json({ok: true});
+  diskCache.delete(req.params.id);
+  // Kurgu kaydını başka proje kullanmıyorsa depodan da sil.
+  const gc = gcMedia();
+  res.json({ok: true, freed: gc.bytes});
 });
 
 /** Kurgu kaydının temel bilgisi (çözünürlük, süre). */
@@ -444,7 +492,13 @@ const UPLOADS = path.join(ROOT, '.uploads');
 fs.mkdirSync(UPLOADS, {recursive: true});
 for (const f of fs.readdirSync(UPLOADS)) fs.rmSync(path.join(UPLOADS, f), {recursive: true, force: true});
 
-const server = app.listen(PORT, '127.0.0.1', () => console.log(`YouTube Enhance sunucusu: http://localhost:${PORT}`));
+const server = app.listen(PORT, '127.0.0.1', () => {
+  console.log(`YouTube Enhance sunucusu: http://localhost:${PORT}`);
+  // Var olan projelerin kurgu kayıtlarını depoya al (aynı video iki projedeyse bir kez yer kaplasın), sahipsizleri sil.
+  ingestAll((s) => console.log(s))
+    .then(() => gcMedia())
+    .catch((e) => console.error('medya deposu:', e.message));
+});
 
 // ── Kapanış: hiçbir alt süreç sahipsiz kalmasın ────────────────────────────
 

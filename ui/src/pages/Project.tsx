@@ -1,7 +1,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import type {RunEvent} from '../../../src/pipeline/run';
 import type {ScenesFile} from '../../../src/shared/types';
-import {api, fmt, STATUS_LABEL, type ProjectDetail} from '../api';
+import {api, fmt, fmtBytes, STATUS_LABEL, type ProjectDetail} from '../api';
 import {navigate} from '../App';
 import {Editor} from '../components/Editor';
 import {Photos} from '../components/Photos';
@@ -105,6 +105,21 @@ export const Project: React.FC<{id: string}> = ({id}) => {
     setTab('editor');
   };
   const onScenes = (scenes: ScenesFile) => setD((x) => (x ? {...x, scenes} : x));
+  const cleanup = async () => {
+    const plan = await api.cleanupPlan(id);
+    if (!plan.items.length) return alert('Temizlenecek yeniden üretilebilir dosya yok.');
+    const list = plan.items.map((i) => `• ${i.path} (${fmtBytes(i.bytes)}): ${i.why}`).join('\n');
+    if (!confirm(`Silinecekler:\n${list}\n\nScript, kurgu kaydı, seçilen fotoğraflar, düzenlemeler ve son video kalır.`)) return;
+    const r = await api.cleanup(id);
+    alert(`${fmtBytes(r.bytes)} yer açıldı.`);
+    load();
+  };
+  const archive = async (archived: boolean) => {
+    if (archived && !confirm('Proje arşive alınsın mı? Listede alta iner, yeniden üretilebilir dosyaları (aday fotoğraflar, görsel katmanı) silinir. Script, kurgu kaydı, düzenlemeler ve son video kalır.')) return;
+    const r = await api.archive(id, archived);
+    if (r.freed) alert(`${fmtBytes(r.freed)} yer açıldı.`);
+    load();
+  };
   const remove = async () => {
     if (!confirm(`"${d?.title}" projesi ve bütün dosyaları silinsin mi? Bu geri alınamaz.`)) return;
     await api.remove(id);
@@ -134,6 +149,12 @@ export const Project: React.FC<{id: string}> = ({id}) => {
             Pipeline'ı yeniden çalıştır
           </button>
         ) : null}
+        <button className="small" onClick={cleanup} disabled={running} title="Yeniden üretilebilir dosyaları (aday fotoğraflar, görsel katmanı, yarım render) siler">
+          Temizle{d.disk?.reclaimable ? ` (${fmtBytes(d.disk.reclaimable)})` : ''}
+        </button>
+        <button className="small" onClick={() => archive(!d.archived)} disabled={running}>
+          {d.archived ? 'Arşivden çıkar' : 'Arşivle'}
+        </button>
         <button className="small danger" onClick={remove} disabled={running}>
           Projeyi sil
         </button>

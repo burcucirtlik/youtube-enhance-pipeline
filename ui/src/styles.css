@@ -48,6 +48,7 @@ h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted); font-weight: 600; t
 .project { display: flex; flex-direction: column; gap: 8px; cursor: pointer; }
 .project:hover { border-color: var(--accent); }
 .project .title { font-weight: 600; font-size: 15px; }
+.projects.archived .project { opacity: 0.6; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); color: var(--muted); }
 .badge.işleniyor, .badge.render { color: var(--accent2); border-color: var(--accent2); }
 .badge.foto-seçimi { color: var(--warn); border-color: var(--warn); }

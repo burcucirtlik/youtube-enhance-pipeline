@@ -21,7 +21,12 @@ export type ProjectSummary = {
   durationSec: number | null;
   sceneCount: number;
   pendingPhotos: number;
+  archived?: boolean;
+  disk?: DiskUsage;
 };
+
+export type DiskUsage = {total: number; shared: number; reclaimable: number; byFolder: Record<string, number>};
+export type CleanupItem = {path: string; bytes: number; why: string};
 
 export type LintIssue = {line: number; level: 'hata' | 'uyarı' | 'bilgi'; msg: string};
 
@@ -54,6 +59,9 @@ export const api = {
   resetEdits: (id: string) => fetch(`/api/projects/${id}/edits`, json('DELETE')).then(j<{scenes: ScenesFile}>),
   lastLog: (id: string) => fetch(`/api/projects/${id}/logs/latest`).then(j<{name?: string; events: RunEvent[]}>),
   render: (id: string, opts: {overlay?: boolean; frames?: string; force?: boolean} = {}) => fetch(`/api/projects/${id}/render`, json('POST', opts)).then(j<ProjectSummary>),
+  cleanupPlan: (id: string) => fetch(`/api/projects/${id}/cleanup`).then(j<{items: CleanupItem[]; disk: DiskUsage}>),
+  cleanup: (id: string) => fetch(`/api/projects/${id}/cleanup`, json('POST')).then(j<{items: CleanupItem[]; bytes: number; disk: DiskUsage}>),
+  archive: (id: string, archived: boolean) => fetch(`/api/projects/${id}/archive`, json('POST', {archived})).then(j<ProjectSummary & {freed: number}>),
   remove: (id: string) => fetch(`/api/projects/${id}`, json('DELETE')).then(j<{ok: true}>),
   cancel: (id: string) => fetch(`/api/projects/${id}/cancel`, json('POST')).then(j<{ok: true}>),
   uploadFiles: (id: string, form: FormData) => fetch(`/api/projects/${id}/files`, {method: 'POST', body: form}).then(j<ProjectDetail>),
@@ -78,6 +86,8 @@ export const fmt = (sec: number) => {
   const m = Math.floor(s / 60);
   return `${m}:${String(s % 60).padStart(2, '0')}`;
 };
+export const fmtBytes = (b: number) =>
+  b >= 1e9 ? `${(b / 1e9).toLocaleString('tr-TR', {maximumFractionDigits: 1})} GB` : b >= 1e6 ? `${Math.round(b / 1e6)} MB` : b >= 1e3 ? `${Math.round(b / 1e3)} KB` : `${b} B`;
 export const fmtMs = (sec: number) => `${fmt(sec)}.${String(Math.floor((sec % 1) * 10))}`;
 
 export const STATUS_LABEL: Record<Status, string> = {

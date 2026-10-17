@@ -39,6 +39,8 @@ Akış:
 
 **Yalnızca değişen yeniden çalışır:** her aşama girdilerinin özetini `build/state.json`'a yazar (script, altyazı, görseller, editör düzenlemeleri, kurgu kaydının imzası, ilgili kod). Hiçbiri değişmediyse aşama atlanır (◌ "değişmedi"); render de öyle: hiçbir şey değişmediyse aynı videoyu yeniden üretmez. İşlem sekmesi son çalıştırmadan beri hangi aşamanın girdisinin değiştiğini **değişti** etiketiyle gösterir; **Güncelle** yalnızca onları çalıştırır. Bir işin günlüğü `build/logs/` altına kaydedilir (en yeni 15); uygulama kapanıp açıldığında son işin aşamaları ve hatası görünür. Zorla yeniden yapmak için CLI'da `--force`.
 
+**Disk:** kurgu kayıtları ortak bir medya deposunda (`.media/`, içerik özetiyle) bir kez tutulur; projelerdeki `footage/kurgu.mp4` ona sabit bağlantıdır (hardlink). Aynı video iki projeye yüklenirse diskte bir kez yer kaplar; uygulama açılışta var olan projeleri de tarar. Proje listesi her projenin boyutunu, başka projeyle ortak kısmını ve temizlenebilir kısmını gösterir. **Temizle** yeniden üretilebilir dosyaları siler (Commons aday fotoğrafları, görsel katmanı, yarım render); script, kurgu kaydı, seçilen fotoğraflar, düzenlemeler, haber/belge görüntüleri ve son video kalır. **Arşivle** projeyi listenin altına alır ve temizler. Proje silinince kaydını başka proje kullanmıyorsa depodan da silinir.
+
 Geliştirme: `npm run server` (API, :3030) ve `npm run ui:dev` (Vite, :5173). Tarayıcıda `http://localhost:5173`. Uygulama arayüzü `dist/ui` altına `npm run ui:build` ile derlenir; `npm run app` bunu kendisi yapar.
 
 ## Kurulum (bir kere)
@@ -173,5 +175,7 @@ videos/YYYY-MM-kisa-baslik/
   footage/   kurgu kaydı
   assets/    elle konan malzeme
   build/     transcript.json, scenes.json, edits.json, state.json, logs/, rapor.md, üretilen varlıklar
+.media/                                 ortak medya deposu (kurgu kayıtları, hardlink; git'e girmez)
+.cache/remotion/                        Remotion paketi önbelleği
   out/       video.mp4, gorsel-katmani.mov, bolumler.txt
 ```
