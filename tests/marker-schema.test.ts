@@ -24,7 +24,7 @@ describe('işaret sözlüğü (tek kaynak)', () => {
   });
 
   // Skill kişisel skill deposunda (~/.claude/skills); kurulu değilse bu denetim atlanır.
-  it("gorsel-isaretleme skill'indeki sözlük bloğu şemadan üretilenle aynı (değilse: npm run skill:sync)", {skip: !fs.existsSync(MARKING_SKILL) && 'skill kurulu değil'}, () => {
+  it("youtube-visual-marker skill'indeki sözlük bloğu şemadan üretilenle aynı (değilse: npm run skill:sync)", {skip: !fs.existsSync(MARKING_SKILL) && 'skill kurulu değil'}, () => {
     const skill = fs.readFileSync(MARKING_SKILL, 'utf8');
     const a = skill.indexOf(SKILL_BLOCK_START);
     const b = skill.indexOf(SKILL_BLOCK_END);

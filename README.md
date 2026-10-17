@@ -11,8 +11,8 @@ script.final.md + kurgu.srt ──► lint ──► zamanlama (SRT) ──► a
 Zena'nın tercihleri ve pipeline'da alınan kararlar [CLAUDE.md](CLAUDE.md) içindeki karar günlüğünde tutulur.
 
 **Skill'ler** ayrı, gizli bir depoda: [my-skillset](https://github.com/burcucirtlik/my-skillset), bu Mac'te `~/.claude/skills`.
-- `youtube-script-writer` çekimden önce script'i yazar (yalnızca konuşulacak metin + sonda "Görsel Fikirleri").
-- `gorsel-isaretleme` kurgudan sonra Descript altyazısından (SRT) işaretli `script.final.md`'yi üretir; pipeline bunu okur.
+- `youtube-script-creator` çekimden önce script'i yazar (yalnızca konuşulacak metin + sonda "Görsel Fikirleri").
+- `youtube-visual-marker` kurgudan sonra Descript altyazısından (SRT) işaretli `script.final.md`'yi üretir; pipeline bunu okur.
 Pipeline skill'leri `~/.claude/skills`'ten bulur (`YTE_SKILLS` ile değiştirilebilir): lint yazım skill'inin tükenmiş ifade listelerini okur; `npm run skill:sync` ve `npm run stats` işaretleme skill'ine yazar.
 
 ## Masaüstü uygulaması
@@ -76,11 +76,11 @@ Masaüstü ikonu ve uygulama bunu kendisi yapar.
 
    Teknik eğitim için sona `--egitim` ekle.
 
-2. **Script'i koy.** `youtube-script-writer`'ın yazdığı `script.md`'yi `videos/2026-10-kisa-baslik/` içine kopyala (çekim script'i; işaret içermez).
+2. **Script'i koy.** `youtube-script-creator`'ın yazdığı `script.md`'yi `videos/2026-10-kisa-baslik/` içine kopyala (çekim script'i; işaret içermez).
 
 3. **Malzemeyi topla.** Ekran kayıtlarını, fotoğrafları, PDF'leri ve kod dosyalarını script'teki adlarla `assets/` içine koy. Descript'ten dışa aktardığın kurguyu `footage/kurgu.mp4`, altyazısını (Export → Subtitles → SRT) `footage/kurgu.srt` olarak kaydet. **Altyazı zorunlu:** görsellerin saniyesi yalnızca buradan hesaplanır. Teknik eğitimde buraya seslendirme (`.wav` ya da `.m4a`) gelir.
 
-4. **Kurgudan sonra işaretle:** Descript altyazısını (ve varsa `script.md`'yi) `gorsel-isaretleme` skill'ine ver; ürettiği `script.final.md`'yi aynı klasöre koy ve kontrol et:
+4. **Kurgudan sonra işaretle:** Descript altyazısını (ve varsa `script.md`'yi) `youtube-visual-marker` skill'ine ver; ürettiği `script.final.md`'yi aynı klasöre koy ve kontrol et:
 
    ```bash
    npm run lint -- 2026-10-kisa-baslik
@@ -129,7 +129,7 @@ Seçilen fotoğraf `assets/` içine kopyalanır. Yazar ve lisans `assets/kaynakl
 
 ## Editör istatistikleri → skill
 
-Editörde her kayıtta (ve `npm run stats` ile) bütün projelerin editör kararları toplanır: her işaret türü için tutulan, ≤ 10 sn kaydırılan, başka cümleye taşınan, süresi değişen ve silinen oranı; kesin ve önerilen (?) işaretlerin silinme oranı; yeterli örnek varsa (tür başına ≥ 5) çıkarımlar. Sonuç `.claude/skills/youtube-script-writer/editor-istatistikleri.md` dosyasına yazılır, skill işaret koymadan önce onu okur. Yalnızca editörde en az bir düzenleme yapılmış projeler sayılır.
+Editörde her kayıtta (ve `npm run stats` ile) bütün projelerin editör kararları toplanır: her işaret türü için tutulan, ≤ 10 sn kaydırılan, başka cümleye taşınan, süresi değişen ve silinen oranı; kesin ve önerilen (?) işaretlerin silinme oranı; yeterli örnek varsa (tür başına ≥ 5) çıkarımlar. Sonuç `.claude/skills/youtube-script-creator/editor-istatistikleri.md` dosyasına yazılır, skill işaret koymadan önce onu okur. Yalnızca editörde en az bir düzenleme yapılmış projeler sayılır.
 
 ## Önerilen (?) işaretler
 

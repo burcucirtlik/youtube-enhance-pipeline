@@ -1,4 +1,4 @@
-// gorsel-isaretleme skill'inin SKILL.md'sindeki işaret sözlüğü bloğunu src/shared/marker-schema.ts'ten yeniden yazar.
+// youtube-visual-marker skill'inin SKILL.md'sindeki işaret sözlüğü bloğunu src/shared/marker-schema.ts'ten yeniden yazar.
 // Blok işaretleri yoksa (ilk çalıştırma), "Animasyonlar" ile "Gerçek görseller" kod bloklarını bulup yerine koyar.
 // Kullanım: npm run skill:sync  (değişiklik yoksa dosyaya dokunmaz)
 
