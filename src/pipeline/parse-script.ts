@@ -160,6 +160,8 @@ export const parseScript = (source: string): ParsedScript => {
           anim: p.anim,
           suggested: p.suggested,
           danger: p.danger,
+          layout: p.layout,
+          at: p.at,
           raw: l,
           line: lineNo,
           props: p.props,

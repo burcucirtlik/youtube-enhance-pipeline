@@ -33,7 +33,7 @@ export const Photos: React.FC<{projectId: string; photos: PhotoStatus[]; onSave:
     }
   };
 
-  if (!searchable.length) return <p className="muted">Bu script'te Commons'ta aranan fotoğraf işareti yok.</p>;
+  if (!searchable.length) return <p className="muted">Bu script'te Commons'ta aranan fotoğraf ya da video işareti yok.</p>;
 
   return (
     <div>
@@ -55,10 +55,15 @@ export const Photos: React.FC<{projectId: string; photos: PhotoStatus[]; onSave:
               return (
                 <div key={c.title} className={`cand ${on ? 'on' : ''}`} onClick={() => toggle(p.file, n)} title={c.description ?? c.title}>
                   <div className="num">{on ? (sel[p.file].indexOf(n) + 1) : n}</div>
-                  {c.local ? <img src={`/files/${projectId}/${c.local}`} alt="" loading="lazy" /> : null}
+                  {c.local && p.media === 'clip' ? (
+                    <video src={`/files/${projectId}/${c.local}`} poster={`/files/${projectId}/${c.local.replace(/\.mp4$/, '.thumb.jpg')}`} muted loop playsInline preload="none" onMouseEnter={(e) => e.currentTarget.play()} onMouseLeave={(e) => e.currentTarget.pause()} />
+                  ) : c.local ? (
+                    <img src={`/files/${projectId}/${c.local}`} alt="" loading="lazy" />
+                  ) : null}
                   <div className="meta">
                     <b>{c.title.replace(/^File:/, '').replace(/\.[a-z]+$/i, '')}</b>
                     <span>
+                      {p.media === 'clip' ? `▶ ${Math.round(c.durationSec ?? 0)} sn · ` : ''}
                       {c.artist} · {c.license} · {c.width}×{c.height}
                       {c.date ? ` · ${c.date}` : ''}
                     </span>

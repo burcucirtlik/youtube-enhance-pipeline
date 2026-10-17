@@ -1,12 +1,15 @@
 // Her sahnenin ortak kabuğu: giriş/çıkış, tehlike tonu (glitch), gren, eksik varlık yer tutucusu, öneri rozeti.
 
 import React from 'react';
-import {AbsoluteFill, getRemotionEnvironment, interpolate, random, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, getRemotionEnvironment, interpolate, OffthreadVideo, random, useCurrentFrame, useVideoConfig} from 'remotion';
 import {brand} from '../../brand/brand';
 import type {Scene, SceneProps} from '../shared/types';
 import {Compare, Concept, Flow, Quote, Stat, Table, Timeline} from './scenes/Diagrams';
 import {Code, Terminal} from './scenes/Dev';
-import {Document, News, Photo, Post, Screen} from './scenes/Media';
+import {OVERLAY_TYPES} from '../shared/marker-schema';
+import {MapScene} from './scenes/Map';
+import {Clip, Document, News, Photo, Post, Screen} from './scenes/Media';
+import {Emphasis, LowerThird} from './scenes/Overlay';
 import {Decode, fill, fonts, glow, H, SmoothInCtx, ToneProvider, useTone, W} from './theme';
 
 const SceneBody: React.FC<{props: SceneProps}> = ({props: p}) => {
@@ -39,8 +42,19 @@ const SceneBody: React.FC<{props: SceneProps}> = ({props: p}) => {
       return <Photo file={p.file} caption={p.caption} />;
     case 'post':
       return <Post platform={p.platform} handle={p.handle} text={p.text} />;
+    case 'clip':
+      return <Clip file={p.file} caption={p.caption} />;
+    case 'map':
+      return <MapScene place={p.place} caption={p.caption} lat={p.lat} lon={p.lon} />;
+    case 'lower':
+      return <LowerThird name={p.name} title={p.title} />;
+    case 'emphasis':
+      return <Emphasis text={p.text} />;
   }
 };
+
+/** Yan yana yerleşim: soldaki yüz paneli ekranın bu oranı, görsel kalanı. */
+const FACE_SHARE = 0.44;
 
 const Placeholder: React.FC<{scene: Scene}> = ({scene}) => (
   <div style={{...fill, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 22, padding: 160, textAlign: 'center', fontFamily: fonts.mono}}>
@@ -143,7 +157,26 @@ const Stage: React.FC<{children: React.ReactNode}> = ({children}) => {
   );
 };
 
-export const SceneShell: React.FC<{scene: Scene; fadeOut?: boolean; crossfadeIn?: boolean}> = ({scene, fadeOut = true, crossfadeIn = false}) => {
+/**
+ * face: yan yana yerleşimde soldaki yüz paneli için kurgu kaydı (render'da). Önizlemede (yalnızca katman) verilmez;
+ * sol taraf saydam kalır, altta oynayan video görünür.
+ */
+export const SceneShell: React.FC<{scene: Scene; fadeOut?: boolean; crossfadeIn?: boolean; face?: {src: string; from: number}}> = ({scene, fadeOut = true, crossfadeIn = false, face}) => {
+  // Alt bant ve vurgu: arka plan yok, kabuk efektleri yok; yüz görünür kalır.
+  if (OVERLAY_TYPES.has(scene.props.type))
+    return (
+      <AbsoluteFill>
+        <Stage>
+          <ToneProvider danger={scene.danger}>
+            <SceneBody props={scene.props} />
+          </ToneProvider>
+        </Stage>
+      </AbsoluteFill>
+    );
+  return <FullScene scene={scene} fadeOut={fadeOut} crossfadeIn={crossfadeIn} face={face} />;
+};
+
+const FullScene: React.FC<{scene: Scene; fadeOut: boolean; crossfadeIn: boolean; face?: {src: string; from: number}}> = ({scene, fadeOut, crossfadeIn, face}) => {
   const frame = useCurrentFrame();
   const {durationInFrames} = useVideoConfig();
   const {enterFrames, exitFrames, glitchFrames, dangerGlitchFrames, crossfadeFrames} = brand.motion;
@@ -169,16 +202,34 @@ export const SceneShell: React.FC<{scene: Scene; fadeOut?: boolean; crossfadeIn?
     };
   }
   const studio = getRemotionEnvironment().isStudio;
+  const body = scene.missingAsset ? <Placeholder scene={scene} /> : <SceneBody props={scene.props} />;
+  const side = scene.layout === 'yan';
+  const faceW = W * FACE_SHARE;
+  const k = 1 - FACE_SHARE; // görselin ölçeği
 
   return (
     <AbsoluteFill style={{opacity}}>
       <Stage>
         <SmoothInCtx.Provider value={crossfadeIn}>
         <ToneProvider danger={scene.danger}>
-          <div style={{...fill, background: brand.colors.bg, ...glitch}}>
-            <Backdrop seed={scene.id} />
-            {scene.missingAsset ? <Placeholder scene={scene} /> : <SceneBody props={scene.props} />}
-          </div>
+          {side ? (
+            <>
+              {face ? (
+                <div style={{position: 'absolute', left: 0, top: 0, width: faceW, height: H, overflow: 'hidden', background: '#000'}}>
+                  <OffthreadVideo src={face.src} trimBefore={face.from} muted style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                </div>
+              ) : null}
+              <div style={{position: 'absolute', left: faceW, top: 0, width: W - faceW, height: H, overflow: 'hidden', background: brand.colors.bg, borderLeft: `3px solid ${brand.colors.accent}`, boxShadow: `-10px 0 30px -12px ${brand.colors.accent}`, ...glitch}}>
+                <Backdrop seed={scene.id} />
+                <div style={{position: 'absolute', left: 0, top: (H - H * k) / 2, width: W, height: H, transform: `scale(${k})`, transformOrigin: 'top left'}}>{body}</div>
+              </div>
+            </>
+          ) : (
+            <div style={{...fill, background: brand.colors.bg, ...glitch}}>
+              <Backdrop seed={scene.id} />
+              {body}
+            </div>
+          )}
           {scene.danger ? <div style={{...fill, boxShadow: `inset 0 0 180px rgba(255,42,109,0.35)`, pointerEvents: 'none'}} /> : null}
           <Overlay />
           {studio && scene.suggested && brand.showSuggestedBadge ? (

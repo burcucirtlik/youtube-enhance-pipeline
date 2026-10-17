@@ -47,7 +47,7 @@ const assetSig = (dir: string) => {
   const p = paths(dir);
   return [dirSig(p.assets), dirSig(p.buildAssets), dirSig(path.join(p.build, 'fotolar'), {skip: (r) => r === 'index.html'})];
 };
-const assetMarkers = (parsed: ParsedScript) => parsed.markers.filter((m) => ['news', 'document', 'photo', 'screen', 'code'].includes(m.props.type)).map((m) => m.props);
+const assetMarkers = (parsed: ParsedScript) => parsed.markers.filter((m) => ['news', 'document', 'photo', 'clip', 'map', 'screen', 'code'].includes(m.props.type)).map((m) => m.props);
 
 export const stageInputs = {
   lint: (dir: string) => hashOf(fileHash(pickScript(dir)), fileHash(SKILL), codeHash('src/pipeline/lint.ts', ...PIPELINE_CODE)),
@@ -66,6 +66,7 @@ export const stageInputs = {
       base,
       fileHash(path.join(p.build, 'edits.json')),
       fileHash(path.join(p.assets, 'kaynaklar.json')),
+      fileHash(path.join(p.build, 'harita.json')),
       assetSig(dir),
       codeHash('src/pipeline/align.ts', 'src/pipeline/edits.ts', 'src/pipeline/commons.ts', ...PIPELINE_CODE),
     );
@@ -235,6 +236,7 @@ export type PhotoStatus = {
   caption?: string;
   query?: string;
   state: 'seçildi' | 'bekliyor' | 'aday-yok' | 'aranmadı' | 'elle';
+  media: 'photo' | 'clip';
   selected: string[]; // seçilen aday başlıkları
   picks: number[]; // seçilen aday numaraları (1'den)
   candidates: CandidateSet['candidates'];
@@ -246,7 +248,7 @@ export const photoStatus = (dir: string, parsed: ParsedScript): PhotoStatus[] =>
   const out: PhotoStatus[] = [];
   const seen = new Set<string>();
   for (const m of parsed.markers) {
-    if (m.props.type !== 'photo' || seen.has(m.props.file)) continue;
+    if ((m.props.type !== 'photo' && m.props.type !== 'clip') || seen.has(m.props.file)) continue;
     seen.add(m.props.file);
     const f = m.props.file;
     const set = m.props.search ? loadCandidateSet(dir, f) : null;
@@ -256,7 +258,7 @@ export const photoStatus = (dir: string, parsed: ParsedScript): PhotoStatus[] =>
     const selectedTitles = selectedFiles.map((x) => reg[x]?.title).filter(Boolean) as string[];
     const picks = set ? selectedTitles.map((t) => set.candidates.findIndex((c) => c.title === t) + 1).filter((n) => n > 0) : [];
     const state: PhotoStatus['state'] = prov ? 'seçildi' : inAssets ? 'elle' : !m.props.search ? 'elle' : !set ? 'aranmadı' : set.candidates.length ? 'bekliyor' : 'aday-yok';
-    out.push({file: f, line: m.line, caption: m.props.caption, query: m.props.search, state: inAssets && !prov && !m.props.search ? 'elle' : state, selected: selectedTitles, picks, candidates: set?.candidates ?? []});
+    out.push({media: m.props.type, file: f, line: m.line, caption: m.props.caption, query: m.props.search, state: inAssets && !prov && !m.props.search ? 'elle' : state, selected: selectedTitles, picks, candidates: set?.candidates ?? []});
   }
   return out;
 };

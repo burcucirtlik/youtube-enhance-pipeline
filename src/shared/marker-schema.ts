@@ -14,6 +14,7 @@ export const ANIM_MARKERS = [
   {type: 'terminal', label: 'Terminal', example: '📍 [ANİM: terminal — `komut`]', use: 'komut satırı (teknik eğitim)'},
   {type: 'code', label: 'Kod', example: '📍 [ANİM: code — dosya.js, satır 4 vurgula]', use: 'kod bloğu (teknik eğitim)'},
   {type: 'concept', label: 'Kavram', example: '📍 [ANİM: concept — "kavramın adı"]', use: 'kanal kavramı / terim kartı'},
+  {type: 'map', label: 'Harita', example: '📍 [ANİM: map — "Kigali, Ruanda", "1994"]', use: 'olayın geçtiği yer (pipeline konumu bulur)'},
 ] as const;
 
 export const REAL_MARKERS = [
@@ -30,22 +31,44 @@ export const REAL_MARKERS = [
     ],
   },
   {kind: 'POST', type: 'post', label: 'Gönderi', examples: [['📍 [POST: platform, @kullanici, "gönderi metni"]', 'tweet / sosyal medya gönderisi']]},
+  {
+    kind: 'KLİP',
+    type: 'clip',
+    label: 'Arşiv videosu',
+    examples: [['📍 [KLİP: dosya-adi.mp4, "Olay, tarih", ara: "english search query"]', "hareketli arşiv görüntüsü (sessiz): pipeline Commons'ta aday arar"]],
+  },
+] as const;
+
+/** Kameranın üstünde: yüz görünür kalır, tam ekran sayılmaz. */
+export const OVERLAY_MARKERS = [
+  {kind: 'ALT', type: 'lower', label: 'Alt bant', examples: [['📍 [ALT: "Ad Soyad", "unvan / kurum"]', 'kişi ya da kurum ilk geçtiğinde ad + unvan']]},
+  {kind: 'VURGU', type: 'emphasis', label: 'Vurgu', examples: [['📍 [VURGU: "iki-dört kelime", @ "söylenen kelime"]', 'espri, sert tespit, akılda kalacak söz']]},
+] as const;
+
+/** İşaretin sonuna eklenebilen seçenekler (her türde). */
+export const MARKER_OPTIONS = [
+  ['📍 [ANİM: stat — "13 milyar $", @ "13 milyar"]', 'görsel cümle başında değil, bu kelimeler söylenince girer'],
+  ['📍 [FOTO: leo.jpg, "Leopold Aschenbrenner", yerleşim: yan]', 'tam ekran yerine yan yana: yüz solda, görsel sağda'],
+  ['📍 [ANİM: stat — "700 ajan", ton: tehlike]', 'risk / uyarı vurgusu (işaretlerin en fazla %15)'],
 ] as const;
 
 /** Kaldırılan türler: eski script'lerde görülürse parser atlar, lint bilgi notu düşer. */
 export const RETIRED_MARKERS = [{kind: 'İLLÜSTRASYON', since: '2026-10-17', aliases: ['İLLÜSTRASYON', 'ILLUSTRASYON', 'İLLUSTRASYON', 'ILLÜSTRASYON']}] as const;
 
 /** Yazım hatası toleransı: kabul edilir ama lint uyarı verir. */
-export const KIND_ALIASES: Record<string, MarkerKind> = {ANIM: 'ANİM'};
+export const KIND_ALIASES: Record<string, MarkerKind> = {ANIM: 'ANİM', KLIP: 'KLİP'};
 
 export type AnimType = (typeof ANIM_MARKERS)[number]['type'];
-export type MarkerKind = 'ANİM' | (typeof REAL_MARKERS)[number]['kind'];
+export type MarkerKind = 'ANİM' | (typeof REAL_MARKERS)[number]['kind'] | (typeof OVERLAY_MARKERS)[number]['kind'];
 
 export const ANIM_TYPES: AnimType[] = ANIM_MARKERS.map((m) => m.type);
-export const MARKER_KINDS: MarkerKind[] = ['ANİM', ...REAL_MARKERS.map((m) => m.kind)];
+export const MARKER_KINDS: MarkerKind[] = ['ANİM', ...REAL_MARKERS.map((m) => m.kind), ...OVERLAY_MARKERS.map((m) => m.kind)];
+
+/** Yüzü kapatmayan sahne türleri: art arda tam ekran sayımına girmez, çapraz geçişe katılmaz. */
+export const OVERLAY_TYPES = new Set<string>(OVERLAY_MARKERS.map((m) => m.type));
 
 /** Sahne türü → arayüz etiketi. */
-export const TYPE_LABEL: Record<string, string> = Object.fromEntries([...ANIM_MARKERS, ...REAL_MARKERS].map((m) => [m.type, m.label]));
+export const TYPE_LABEL: Record<string, string> = Object.fromEntries([...ANIM_MARKERS, ...REAL_MARKERS, ...OVERLAY_MARKERS].map((m) => [m.type, m.label]));
 
 // ── Skill'deki sözlük bloğu ────────────────────────────────────────────────
 
@@ -69,6 +92,16 @@ export const skillDictionary = (): string =>
     '**Gerçek görseller:**',
     '```',
     column(REAL_MARKERS.flatMap((m): (readonly [string, string])[] => [...m.examples])),
+    '```',
+    '',
+    '**Kameranın üstünde (yüz görünür kalır):**',
+    '```',
+    column(OVERLAY_MARKERS.flatMap((m): (readonly [string, string])[] => [...m.examples])),
+    '```',
+    '',
+    '**Her işaretin sonuna eklenebilir:**',
+    '```',
+    column([...MARKER_OPTIONS]),
     '```',
     SKILL_BLOCK_END,
   ].join('\n');

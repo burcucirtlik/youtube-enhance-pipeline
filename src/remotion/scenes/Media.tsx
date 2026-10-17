@@ -1,4 +1,4 @@
-// Gerçek görseller: ekran kaydı, haber, belge, fotoğraf, gönderi.
+// Gerçek görseller: ekran kaydı, haber, belge, fotoğraf, arşiv videosu, gönderi.
 
 import React from 'react';
 import {Img, interpolate, OffthreadVideo, useCurrentFrame, useVideoConfig} from 'remotion';
@@ -113,6 +113,30 @@ export const Photo: React.FC<{file: string; caption?: string}> = ({file, caption
           <div style={{...fill, background: 'linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.8) 100%)'}} />
           <div style={{position: 'absolute', left: brand.frame.padding, bottom: 80, opacity: c, transform: `translateX(${(1 - c) * -30}px)`, borderLeft: `4px solid ${tone.accent}`, boxShadow: `-8px 0 18px -10px ${tone.accent}`, paddingLeft: 26}}>
             <div style={{fontFamily: fonts.mono, fontSize: 20, letterSpacing: 4, color: tone.accent2, marginBottom: 6}}>{'// ARŞİV'}</div>
+            <Decode text={name.trim()} delay={10} style={{display: 'block', fontFamily: fonts.display, fontWeight: 700, fontSize: 58, color: tone.accent, ...glow(tone.accent, 0.6)}} />
+            {rest.length ? <div style={{fontFamily: fonts.mono, fontSize: 26, color: brand.colors.text, opacity: 0.85, marginTop: 8}}>{rest.join(' · ').trim()}</div> : null}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+};
+
+/** Arşiv videosu: sessiz, kendi oranında (siyah boşluklu), fotoğrafla aynı künye. */
+export const Clip: React.FC<{file: string; caption?: string}> = ({file, caption}) => {
+  const src = useSrc();
+  const tone = useTone();
+  const c = useEnter(10);
+  const [name, ...rest] = (caption ?? '').includes(' · ') ? (caption ?? '').split(' · ') : (caption ?? '').split(',');
+  return (
+    <div style={{...fill, background: '#000'}}>
+      <OffthreadVideo src={src(file)} muted style={{...fill, width: '100%', height: '100%', objectFit: 'contain'}} />
+      <Tint />
+      {caption ? (
+        <>
+          <div style={{...fill, background: 'linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.8) 100%)'}} />
+          <div style={{position: 'absolute', left: brand.frame.padding, bottom: 80, opacity: c, transform: `translateX(${(1 - c) * -30}px)`, borderLeft: `4px solid ${tone.accent}`, boxShadow: `-8px 0 18px -10px ${tone.accent}`, paddingLeft: 26}}>
+            <div style={{fontFamily: fonts.mono, fontSize: 20, letterSpacing: 4, color: tone.accent2, marginBottom: 6}}>{'// ARŞİV · VİDEO'}</div>
             <Decode text={name.trim()} delay={10} style={{display: 'block', fontFamily: fonts.display, fontWeight: 700, fontSize: 58, color: tone.accent, ...glow(tone.accent, 0.6)}} />
             {rest.length ? <div style={{fontFamily: fonts.mono, fontSize: 26, color: brand.colors.text, opacity: 0.85, marginTop: 8}}>{rest.join(' · ').trim()}</div> : null}
           </div>

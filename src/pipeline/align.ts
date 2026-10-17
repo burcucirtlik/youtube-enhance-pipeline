@@ -4,8 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type {Chapter, Marker, Scene, SceneProps, ScenesFile} from '../shared/types';
 import type {ParsedScript} from './parse-script';
-import {levenshtein, normalizeWord} from './text';
-import {loadCandidateSet, loadRegistry, withCredit} from './commons';
+import {levenshtein, normalizeWord, tokenize} from './text';
+import {timedVisualChecks} from './visual-checks';
+import {loadCandidateSet, loadPlaces, loadRegistry, withCredit} from './commons';
 import {applyEdits, loadEdits, migrateEdits} from './edits';
 import {assetKey, ffprobe, paths, rel, type Probe} from './util';
 
@@ -112,13 +113,17 @@ export const DEFAULT_ALIGN: AlignOptions = {
 
 type SentenceTime = {start: number; end: number; coverage: number} | null;
 
-export const sentenceTimes = (s: ParsedScript, t: Transcript): SentenceTime[] => {
+export const sentenceTimes = (s: ParsedScript, t: Transcript): SentenceTime[] => alignScript(s, t).times;
+
+/** Cümle zamanları + tek tek script kelimelerinin kayıttaki zamanı (bulunamayan kelime: null). */
+export const alignScript = (s: ParsedScript, t: Transcript) => {
   const spoken = t.words.map((w) => normalizeWord(w.w));
   // Boş normalize olan transkript kelimelerini (sadece noktalama) çıkar ama indeksleri koru.
   const keep: number[] = [];
   spoken.forEach((w, k) => w && keep.push(k));
   const map = alignWords(s.words, keep.map((k) => spoken[k]));
-  return s.sentences.map((sen) => {
+  const wordTime = (w: number) => (map[w] >= 0 ? t.words[keep[map[w]]] : null);
+  const times = s.sentences.map((sen): SentenceTime => {
     let first = -1;
     let last = -1;
     let matched = 0;
@@ -135,7 +140,30 @@ export const sentenceTimes = (s: ParsedScript, t: Transcript): SentenceTime[] =>
     if (matched < needed) return null;
     return {start: t.words[first].start, end: t.words[last].end, coverage};
   });
+  return {times, wordTime};
 };
+
+/**
+ * `@ "kelime"`: cümlenin içinde bu kelimelerin söylendiği an. Türkçe ekler için kelimenin başı eşleşmesi yeter
+ * ("milyar" ↔ "milyarı"). Bulunamazsa null; sahne cümle başında girer.
+ */
+export const anchorTime = (s: ParsedScript, si: number, phrase: string, wordTime: (w: number) => {start: number} | null): number | null => {
+  const toks = tokenize(phrase);
+  if (!toks.length) return null;
+  const sen = s.sentences[si];
+  const same = (a: string, b: string) => a === b || (Math.min(a.length, b.length) >= 4 && (a.startsWith(b) || b.startsWith(a)));
+  for (let w = sen.wordStart; w + toks.length <= sen.wordEnd; w++) {
+    if (!toks.every((tk, k) => same(s.words[w + k], tk))) continue;
+    for (let k = 0; k < toks.length; k++) {
+      const wt = wordTime(w + k);
+      if (wt) return wt.start;
+    }
+  }
+  return null;
+};
+
+/** Türe göre ekranda kalma süresi sınırları (sn); verilmeyenler AlignOptions'tan. */
+const DURATION: Partial<Record<SceneProps['type'], [number, number]>> = {lower: [3, 5], emphasis: [1.5, 3], map: [3, 7]};
 
 const resolveAsset = (dir: string, props: SceneProps, probeCache: Map<string, Probe>): {props: SceneProps; missing?: string} => {
   const p = paths(dir);
@@ -155,6 +183,24 @@ const resolveAsset = (dir: string, props: SceneProps, probeCache: Map<string, Pr
       const first = loadCandidateSet(dir, props.file)?.candidates[0];
       if (first?.local) return {props: {...props, file: first.local, caption: withCredit(props.caption, first), provisional: true}};
       return {props, missing: `assets/${props.file}${props.search ? ' (npm run assets ile aday ara)' : ''}`};
+    }
+    case 'clip': {
+      const probe = (f: string) => {
+        if (!probeCache.has(f)) probeCache.set(f, ffprobe(f));
+        return probeCache.get(f)!.durationSec;
+      };
+      const f = inAssets(props.file);
+      if (fs.existsSync(f)) return {props: {...props, file: rel(dir, f), caption: withCredit(props.caption, loadRegistry(dir)[props.file], 'Video'), mediaDurationSec: probe(f)}};
+      const first = loadCandidateSet(dir, props.file)?.candidates[0];
+      if (first?.local)
+        return {props: {...props, file: first.local, caption: withCredit(props.caption, first, 'Video'), provisional: true, mediaDurationSec: probe(path.join(dir, first.local))}};
+      return {props, missing: `assets/${props.file}${props.search ? ' (npm run assets ile aday ara)' : ''}`};
+    }
+    case 'map': {
+      if (props.lat !== undefined && props.lon !== undefined) return {props};
+      const hit = loadPlaces(dir)[props.place];
+      if (hit) return {props: {...props, lat: hit.lat, lon: hit.lon}};
+      return {props, missing: `"${props.place}" konumu bulunamadı (npm run assets; ya da işarete konum: enlem, boylam yaz)`};
     }
     case 'code': {
       const f = inAssets(props.file);
@@ -189,7 +235,7 @@ export const buildScenes = (
   base: {file: string; kind: 'video' | 'audio'; probe: Probe},
   opts: AlignOptions = DEFAULT_ALIGN,
 ): ScenesFile => {
-  const times = sentenceTimes(s, t);
+  const {times, wordTime} = alignScript(s, t);
   const warnings: string[] = [];
   const dropped: ScenesFile['dropped'] = [];
   const duration = base.probe.durationSec || t.duration;
@@ -204,7 +250,7 @@ export const buildScenes = (
   const registry = loadRegistry(dir);
   const markers: Marker[] = s.markers.flatMap((m) => {
     const pr = m.props;
-    if (pr.type !== 'photo') return [m];
+    if (pr.type !== 'photo' && pr.type !== 'clip') return [m];
     const extra = registry[pr.file]?.extra ?? [];
     return [m, ...extra.map((file, i): Marker => ({...m, id: `${m.id}#${i + 2}`, props: {...pr, file}}))];
   });
@@ -237,14 +283,23 @@ export const buildScenes = (
     const groupStart = Math.max(st.start, cursor);
     if (groupStart - st.start > 2) warnings.push(`Satır ${ms[0].line}: önceki işaretler taştığı için sahne cümlesinden ${(groupStart - st.start).toFixed(1)} sn geç giriyor`);
     cursor = groupStart + span;
+    let prevStart = -Infinity;
     ms.forEach((m, k) => {
       const {props, missing} = resolveAsset(dir, m.props, probeCache);
-      const start = groupStart + k * slot;
-      let end = start + slot + (k === ms.length - 1 ? opts.tailSec : 0);
+      // @ "kelime": görsel o kelime söylenince girer (biraz önce: göz kelimeyi duyduğunda görseli bulsun).
+      const at = m.at ? anchorTime(s, si, m.at, wordTime) : null;
+      if (m.at && at === null) warnings.push(`Satır ${m.line}: @ "${m.at}" cümlede ya da kayıtta bulunamadı; görsel cümle başında giriyor`);
+      let start = at !== null ? Math.max(at - 0.15, groupStart) : groupStart + k * slot;
+      start = Math.max(start, prevStart + 0.5);
+      prevStart = start;
+      const [minSec, maxSec] = DURATION[props.type] ?? [opts.minSceneSec, opts.maxSceneSec];
+      let end = (at !== null ? Math.max(st.end, start + slot) : start + slot) + (k === ms.length - 1 ? opts.tailSec : 0);
       if (props.type === 'screen' && props.mediaDurationSec) end = Math.max(end, start + Math.min(props.mediaDurationSec, opts.maxScreenSec));
-      else end = Math.min(Math.max(end, start + opts.minSceneSec), start + opts.maxSceneSec);
+      else end = Math.min(Math.max(end, start + minSec), start + maxSec);
+      // Arşiv videosu kendi süresinden uzun gösterilmez (son karede donmasın).
+      if (props.type === 'clip' && props.mediaDurationSec) end = Math.min(end, start + Math.max(minSec, props.mediaDurationSec));
       if (missing) warnings.push(`Satır ${m.line}: varlık eksik → ${missing} (yer tutucu çizilecek)`);
-      if (props.type === 'photo' && props.provisional) warnings.push(`Satır ${m.line}: ${m.props.type === 'photo' ? m.props.file : ''} henüz seçilmedi, geçici olarak 1. aday kullanılıyor (build/fotolar/index.html)`);
+      if ((props.type === 'photo' || props.type === 'clip') && props.provisional) warnings.push(`Satır ${m.line}: ${props.file.split('/').pop()} henüz seçilmedi, geçici olarak 1. aday kullanılıyor`);
       scenes.push({
         id: `s${String(scenes.length + 1).padStart(3, '0')}`,
         markerId: m.id,
@@ -252,6 +307,7 @@ export const buildScenes = (
         kind: m.kind,
         suggested: m.suggested,
         danger: m.danger,
+        layout: m.layout,
         startSec: start,
         endSec: end,
         anchorText: s.sentences[si].text,
@@ -312,5 +368,8 @@ export const buildScenes = (
   const applied = applyEdits(result, edits);
   const editedCount = applied.scenes.filter((x) => x.edited || x.disabled).length;
   if (editedCount) warnings.push(`${editedCount} sahnede editör düzenlemesi uygulandı (build/edits.json)`);
-  return {...applied, aligned: result.scenes};
+  // İzlenebilirlik denetimleri editörden sonraki hâl üzerinde: okuma hızı, görselsiz aralık, ilk 90 / son 20 sn, bölümler.
+  const out = {...applied, aligned: result.scenes};
+  out.warnings = [...out.warnings, ...timedVisualChecks(out)];
+  return out;
 };

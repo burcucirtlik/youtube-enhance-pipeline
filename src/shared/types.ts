@@ -23,7 +23,15 @@ export type SceneProps =
   | {type: 'news'; url: string; highlight: string | null; image?: string; rects?: HighlightRect[]; imageSize?: Size}
   | {type: 'document'; file: string; page: number; highlight: string | null; image?: string; rects?: HighlightRect[]; imageSize?: Size}
   | {type: 'photo'; file: string; caption?: string; search?: string; provisional?: boolean}
-  | {type: 'post'; platform: string; handle: string; text: string};
+  | {type: 'post'; platform: string; handle: string; text: string}
+  | {type: 'map'; place: string; caption?: string; lat?: number; lon?: number}
+  | {type: 'clip'; file: string; caption?: string; search?: string; provisional?: boolean; mediaDurationSec?: number}
+  // Kameranın üstünde (yüz görünür kalır):
+  | {type: 'lower'; name: string; title?: string}
+  | {type: 'emphasis'; text: string};
+
+/** Tam ekran görsellerin yerleşimi: tam ekran (varsayılan) ya da yan yana (yüz solda, görsel sağda). */
+export type Layout = 'tam' | 'yan';
 
 export type Size = {width: number; height: number};
 export type HighlightRect = {x: number; y: number; width: number; height: number};
@@ -34,6 +42,8 @@ export type Marker = {
   anim?: AnimType;
   suggested: boolean; // 📍 [ANİM?: ...]
   danger: boolean; // ton: tehlike
+  layout?: Layout; // yerleşim: yan
+  at?: string; // @ "kelime": görsel bu kelimenin söylendiği anda girer
   raw: string; // satırın kendisi
   line: number; // script içindeki satır numarası (1'den başlar)
   props: SceneProps;
@@ -64,6 +74,7 @@ export type Scene = {
   kind: MarkerKind;
   suggested: boolean;
   danger: boolean;
+  layout?: Layout;
   startSec: number;
   endSec: number;
   anchorText: string;

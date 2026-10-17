@@ -2,7 +2,7 @@
 // burada her türün içeriğinin nasıl ayrıştırıldığı var.
 
 import {ANIM_TYPES, KIND_ALIASES, MARKER_KINDS, RETIRED_MARKERS} from '../shared/marker-schema';
-import type {AnimType, LabeledText, MarkerKind, SceneProps} from '../shared/types';
+import type {AnimType, LabeledText, Layout, MarkerKind, SceneProps} from '../shared/types';
 
 export const MARKER_LINE = /^\s*📍\s*\[(.*)\]\s*$/u;
 
@@ -17,6 +17,8 @@ export type ParsedMarker = {
   anim?: AnimType;
   suggested: boolean;
   danger: boolean;
+  layout?: Layout;
+  at?: string;
   props: SceneProps;
   issues: string[]; // lint için yazım sorunları (parse yine de başarılı)
 };
@@ -79,18 +81,32 @@ export const parseMarker = (inner: string): ParsedMarker => {
   const suggested = Boolean(head[2]);
   let body = head[3].trim();
 
-  // ", ton: tehlike" her türde en sonda gelebilir.
+  // Her türde en sonda, herhangi bir sırayla: ", ton: tehlike", ", yerleşim: yan", ', @ "söylenen kelime"'.
   let danger = false;
-  const tone = body.match(/,?\s*ton\s*:\s*([\p{L}-]+)\s*$/u);
-  if (tone) {
-    if (tone[1].toLocaleLowerCase('tr-TR') !== 'tehlike') issues.push(`Bilinmeyen ton: ${tone[1]} (sadece "tehlike" var)`);
-    danger = tone[1].toLocaleLowerCase('tr-TR') === 'tehlike';
-    body = body.slice(0, tone.index).trim();
+  let layout: Layout | undefined;
+  let at: string | undefined;
+  for (;;) {
+    const opt = body.match(/,?\s*(?:ton\s*:\s*([\p{L}-]+)|yerleşim\s*:\s*([\p{L}-]+)|@\s*(?:"([^"]+)"|“([^”]+)”))\s*$/u);
+    if (!opt) break;
+    body = body.slice(0, opt.index).trim();
+    if (opt[1]) {
+      const t = opt[1].toLocaleLowerCase('tr-TR');
+      if (t !== 'tehlike') issues.push(`Bilinmeyen ton: ${opt[1]} (sadece "tehlike" var)`);
+      danger = t === 'tehlike';
+    } else if (opt[2]) {
+      const l = opt[2].toLocaleLowerCase('tr-TR');
+      if (l === 'yan' || l === 'tam') layout = l;
+      else issues.push(`Bilinmeyen yerleşim: ${opt[2]} ("yan" ya da "tam")`);
+    } else at = (opt[3] ?? opt[4]).trim();
   }
 
   const props = parseBody(kind, body, issues);
   const anim = props.type in ANIM_SET ? (props.type as AnimType) : undefined;
-  return {kind, anim, suggested, danger, props, issues};
+  if (layout === 'yan' && (props.type === 'lower' || props.type === 'emphasis')) {
+    issues.push(`${kind} zaten yüzün üstünde; "yerleşim: yan" yok sayıldı`);
+    layout = undefined;
+  }
+  return {kind, anim, suggested, danger, layout, at, props, issues};
 };
 
 const ANIM_SET: Record<string, true> = Object.fromEntries(ANIM_TYPES.map((t) => [t, true]));
@@ -137,8 +153,9 @@ const parseBody = (kind: MarkerKind, body: string, issues: string[]): SceneProps
       if (!pageStr) issues.push('BELGE: sayfa ("s. 12") eksik, 1. sayfa varsayıldı');
       return {type: 'document', file, page, highlight: parseHighlight(hl, issues)};
     }
-    case 'FOTO': {
-      // ara: "..." → pipeline bu sorguyla Wikimedia Commons'ta arşiv fotoğrafı adayı arar.
+    case 'FOTO':
+    case 'KLİP': {
+      // ara: "..." → pipeline bu sorguyla Wikimedia Commons'ta arşiv fotoğrafı / videosu adayı arar.
       let rest = body;
       let search: string | undefined;
       const am = rest.match(/,?\s*ara\s*:\s*(?:"([^"]*)"|“([^”]*)”)\s*$/u);
@@ -147,7 +164,23 @@ const parseBody = (kind: MarkerKind, body: string, issues: string[]): SceneProps
         rest = rest.slice(0, am.index).trim();
       }
       const parts = splitTopLevel(rest);
-      return {type: 'photo', file: parts[0] ?? '', caption: parts[1] ? unquote(parts.slice(1).join(', ')) : undefined, search};
+      const file = parts[0] ?? '';
+      const caption = parts[1] ? unquote(parts.slice(1).join(', ')) : undefined;
+      if (kind === 'KLİP') {
+        if (file && !/\.(mp4|mov|webm|m4v)$/i.test(file)) issues.push(`KLİP: dosya adı video uzantılı olmalı (.mp4): ${file}`);
+        return {type: 'clip', file, caption, search};
+      }
+      return {type: 'photo', file, caption, search};
+    }
+    case 'ALT': {
+      const q = quoted(body);
+      if (!q.length) throw new MarkerError('ALT: "Ad Soyad", "unvan" biçiminde olmalı');
+      return {type: 'lower', name: q[0], title: q[1]};
+    }
+    case 'VURGU': {
+      const q = quoted(body);
+      if (!q.length) throw new MarkerError('VURGU: "kısa metin" biçiminde olmalı');
+      return {type: 'emphasis', text: q[0]};
     }
     case 'POST': {
       const parts = splitTopLevel(body);
@@ -220,6 +253,13 @@ const parseAnim = (body: string, issues: string[]): SceneProps => {
     }
     case 'concept':
       return {type: 'concept', term: q[0] ?? rest, definition: q[1]};
+    case 'map': {
+      // konum: enlem, boylam — verilmezse pipeline yer adından bulur (OpenStreetMap).
+      const km = rest.match(/,?\s*konum\s*:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/u);
+      const qq = quoted(km ? rest.slice(0, km.index) : rest);
+      if (!qq.length) issues.push('map: yer adı tırnak içinde olmalı ("Kigali, Ruanda")');
+      return {type: 'map', place: qq[0] ?? rest, caption: qq[1], lat: km ? Number(km[1]) : undefined, lon: km ? Number(km[2]) : undefined};
+    }
   }
 };
 

@@ -1,6 +1,7 @@
 // Sahnelerin kare aralıkları: Remotion kompozisyonu (Main.tsx) ve parça render'ı (run.ts) aynı hesabı kullanır.
 // İkisi ayrı hesaplarsa parça render'ı bir sahnenin kenarını kaçırabilir.
 
+import {OVERLAY_TYPES} from './marker-schema';
 import type {Scene, ScenesFile} from './types';
 
 export type SceneSequence = {scene: Scene; from: number; durationInFrames: number; joinedPrev: boolean; joinedNext: boolean};
@@ -21,8 +22,10 @@ export const sceneSequences = (data: ScenesFile, opts: {includeSuggested: boolea
     const dur = Math.max(1, Math.round(scene.endSec * fps) - from);
     const prev = scenes[i - 1];
     const next = scenes[i + 1];
-    const joinedNext = Boolean(next && next.startSec - scene.endSec < 0.2);
-    const joinedPrev = Boolean(prev && scene.startSec - prev.endSec < 0.2);
+    // Çapraz geçiş yalnızca iki tam ekran görsel arasında; alt bant ve vurgu kendi girişini yapar.
+    const full = (x?: Scene) => Boolean(x && !OVERLAY_TYPES.has(x.props.type));
+    const joinedNext = full(scene) && full(next) && next!.startSec - scene.endSec < 0.2;
+    const joinedPrev = full(scene) && full(prev) && scene.startSec - prev!.endSec < 0.2;
     return {scene, from, durationInFrames: dur + (joinedNext ? opts.crossfadeFrames + 2 : 0), joinedPrev, joinedNext};
   });
 };

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type {Marker} from '../shared/types';
 import type {ParsedScript} from './parse-script';
-import {fetchCandidates} from './commons';
+import {fetchCandidates, geocodePlaces, loadPlaces} from './commons';
 import {assetKey, paths, python, ROOT} from './util';
 
 type Result = {line: number; what: string; status: 'hazır' | 'üretildi' | 'eksik' | 'uyarı'; note?: string};
@@ -56,31 +56,49 @@ export const collectAssets = async (dir: string, s: ParsedScript, opts: {force?:
       }
     }
 
-    if (pr.type === 'photo' && pr.search && !fs.existsSync(path.join(p.assets, pr.file)) && !done.has(pr.file)) {
+    if ((pr.type === 'photo' || pr.type === 'clip') && pr.search && !fs.existsSync(path.join(p.assets, pr.file)) && !done.has(pr.file)) {
       done.add(pr.file);
+      const label = pr.type === 'clip' ? 'KLİP' : 'FOTO';
       try {
         const set = await fetchCandidates(dir, m, opts.force ?? false);
         results.push({
           line: m.line,
-          what: `FOTO ${pr.file}`,
+          what: `${label} ${pr.file}`,
           status: set.candidates.length ? 'uyarı' : 'eksik',
           note: set.candidates.length
             ? `${set.candidates.length} aday Commons'tan indirildi → seç: build/fotolar/index.html (seçilene kadar 1. aday geçici kullanılır)`
             : `"${pr.search}" için Commons'ta uygun aday yok; sorguyu değiştir ya da dosyayı elle koy`,
         });
       } catch (e: any) {
-        results.push({line: m.line, what: `FOTO ${pr.file}`, status: 'eksik', note: e.message});
+        results.push({line: m.line, what: `${label} ${pr.file}`, status: 'eksik', note: e.message});
       }
       continue;
     }
 
-    if (pr.type === 'screen' || pr.type === 'photo' || pr.type === 'code') {
+    if (pr.type === 'screen' || pr.type === 'photo' || pr.type === 'clip' || pr.type === 'code') {
       if (done.has(pr.file)) continue;
       done.add(pr.file);
       const ok = fs.existsSync(path.join(p.assets, pr.file));
-      const label = pr.type === 'screen' ? 'EKRAN' : pr.type === 'photo' ? 'FOTO' : 'KOD';
-      const note = pr.type === 'screen' ? `çekilecek: ${pr.note ?? ''}` : pr.type === 'photo' ? `bulunacak: ${pr.caption ?? ''}` : 'kod dosyasını assets/ içine koy';
+      const label = pr.type === 'screen' ? 'EKRAN' : pr.type === 'photo' ? 'FOTO' : pr.type === 'clip' ? 'KLİP' : 'KOD';
+      const note = pr.type === 'screen' ? `çekilecek: ${pr.note ?? ''}` : pr.type === 'photo' || pr.type === 'clip' ? `bulunacak: ${pr.caption ?? ''}` : 'kod dosyasını assets/ içine koy';
       results.push({line: m.line, what: `${label} assets/${pr.file}`, status: ok ? 'hazır' : 'eksik', note: ok ? undefined : note});
+    }
+  }
+
+  // Harita: yer adları koordinata (konum: verilmemişse).
+  const maps = s.markers.filter((m) => m.props.type === 'map' && m.props.lat === undefined);
+  if (maps.length) {
+    const places = maps.map((m) => (m.props as {place: string}).place);
+    const known = loadPlaces(dir);
+    try {
+      const {missing} = await geocodePlaces(dir, places.filter((x) => !known[x] || opts.force));
+      for (const m of maps) {
+        const place = (m.props as {place: string}).place;
+        const miss = missing.includes(place);
+        results.push({line: m.line, what: `HARİTA ${place}`, status: miss ? 'eksik' : 'hazır', note: miss ? 'yer bulunamadı; adı değiştir ya da konum: enlem, boylam yaz' : undefined});
+      }
+    } catch (e: any) {
+      for (const m of maps) results.push({line: m.line, what: `HARİTA ${(m.props as {place: string}).place}`, status: 'eksik', note: e.message});
     }
   }
 

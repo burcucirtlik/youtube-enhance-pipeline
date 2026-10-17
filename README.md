@@ -165,9 +165,21 @@ Açılan **Galeri** kompozisyonu bütün animasyon türlerini örnek verilerle g
 | `EKRAN` | Çerçeveli ekran kaydı | `assets/screen-01.mp4` |
 | `HABER` | Sayfa görüntüsü + fosforlu kalem + yakınlaşma | Playwright otomatik çeker |
 | `BELGE` | PDF sayfası + vurgu | `assets/rapor.pdf` |
-| `FOTO` | Ken Burns + isim/unvan | `assets/kisi.jpg` |
+| `ANİM: map` | Dünyadan yere yakınlaşan tel kafes harita + işaret | yer adı → koordinat (OpenStreetMap, `build/harita.json`) ya da `konum:` |
+| `FOTO` | Ken Burns + isim/unvan | `assets/kisi.jpg` ya da Commons adayı (`ara:`) |
+| `KLİP` | Sessiz arşiv videosu + künye | Commons video adayı (`ara:`; ≤ 60 sn, ≤ 720p MP4'e çevrilir) ya da `assets/` |
 | `POST` | Gönderi kartı | script'teki metin |
+| `ALT` | Alt bant: ad + unvan (yüz görünür) | script'teki metin |
+| `VURGU` | Kinetik kısa metin (yüz görünür) | script'teki metin |
+| `, @ "kelime"` | Görsel cümle başında değil, o kelime söylenince girer | altyazıdaki kelime zamanı |
+| `, yerleşim: yan` | Yüz solda (kayıttan kırpılır), görsel sağda | — |
 | `, ton: tehlike` | Kırmızı-pembe vurgu + glitch girişi | — |
+
+**İzlenebilirlik denetimleri** (`src/pipeline/visual-checks.ts`; skill'in makineyle denetlenebilen kuralları):
+- **Lint:** telefonda okunmayacak metin (alıntı > 15 kelime, tablo > 3×4, akış > 4 adım…), aynı animasyon türü art arda 3+, ekrandaki rakamın cümlede söylenenle uyuşmaması, tam ekranla aynı cümledeki alt bant.
+- **Hizalamadan sonra:** okuma hızı (saniyede > 3 kelime), 60 sn'den uzun görselsiz aralık, ilk 90 sn'de 3'ten az görsel, son 20 sn'de görsel (bitiş ekranı), YouTube bölüm kuralları (≥ 3 bölüm, her biri ≥ 10 sn).
+
+Yan yana yerleşimde uygulamanın önizlemesi soldaki yüzü kırpmaz (video olduğu gibi altta oynar); render kırpar.
 
 Eksik bir varlık render'ı durdurmaz: o sahne "EKSİK GÖRSEL" yer tutucusuyla çizilir ve raporda listelenir.
 

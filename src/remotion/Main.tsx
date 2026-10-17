@@ -33,7 +33,12 @@ const Timeline: React.FC<Omit<MainProps, 'assetBase'>> = ({data, includeSuggeste
         // Peş peşe iki görsel: aralarında kameraya dönülmez ve glitch yok. Önceki sahne, sonraki üstüne
         // yumuşakça açılana kadar (crossfadeFrames) tam görünür kalır; sonraki çapraz geçişle girer.
         <Sequence key={sc.id} from={from} durationInFrames={durationInFrames} name={`${sc.line}: ${sc.props.type}${sc.suggested ? '?' : ''}`}>
-          <SceneShell scene={sc} fadeOut={!joinedNext} crossfadeIn={joinedPrev} />
+          <SceneShell
+            scene={sc}
+            fadeOut={!joinedNext}
+            crossfadeIn={joinedPrev}
+            face={sc.layout === 'yan' && !overlayOnly && base.kind === 'video' ? {src: src(base.src), from} : undefined}
+          />
         </Sequence>
       ))}
     </AbsoluteFill>

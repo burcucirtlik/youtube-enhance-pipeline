@@ -20,12 +20,13 @@ const DEFAULT_WINDOW_SEC = 90; // açılışta görünen aralık
 const SNAP_PX = 8;
 const MIN_LEN = 0.3;
 
-type TrackId = 'foto' | 'haber' | 'ekran' | 'anim';
+type TrackId = 'foto' | 'haber' | 'ekran' | 'anim' | 'ust';
 const TRACKS: {id: TrackId; label: string; types: string[]}[] = [
-  {id: 'foto', label: 'Fotoğraf', types: ['photo']},
+  {id: 'foto', label: 'Fotoğraf · Video', types: ['photo', 'clip']},
   {id: 'haber', label: 'Haber · Belge', types: ['news', 'document', 'post']},
   {id: 'ekran', label: 'Ekran kaydı', types: ['screen']},
-  {id: 'anim', label: 'Animasyon', types: ['flow', 'compare', 'table', 'timeline', 'stat', 'quote', 'concept', 'terminal', 'code']},
+  {id: 'anim', label: 'Animasyon', types: ['flow', 'compare', 'table', 'timeline', 'stat', 'quote', 'concept', 'terminal', 'code', 'map']},
+  {id: 'ust', label: 'Kamera üstü', types: ['lower', 'emphasis']},
 ];
 const trackOf = (s: Scene): TrackId => TRACKS.find((t) => t.types.includes(s.props.type))?.id ?? 'anim';
 
@@ -51,6 +52,14 @@ const blockTitle = (s: Scene): string => {
       return `Akış · ${p.steps[0] ?? ''}`;
     case 'screen':
       return p.file;
+    case 'clip':
+      return `▶ ${(p.caption ?? p.file).split(/ · |,/)[0]}`;
+    case 'map':
+      return `⌖ ${p.place}`;
+    case 'lower':
+      return `Alt bant · ${p.name}`;
+    case 'emphasis':
+      return `“${p.text}”`;
     default:
       return TYPE_LABEL[p.type] ?? p.type;
   }

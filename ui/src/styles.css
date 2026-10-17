@@ -86,7 +86,7 @@ h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted); font-weight: 600; t
 .cand { border: 2px solid var(--line); border-radius: var(--radius); overflow: hidden; cursor: pointer; background: var(--panel2); position: relative; }
 .cand:hover { border-color: var(--accent2); }
 .cand.on { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0, 224, 138, 0.3); }
-.cand img { display: block; width: 100%; aspect-ratio: 16/10; object-fit: contain; background: #000; }
+.cand img, .cand video { display: block; width: 100%; aspect-ratio: 16/10; object-fit: contain; background: #000; }
 .cand .meta { padding: 8px 10px; font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
 .cand .meta b { color: var(--fg); font-weight: 500; }
 .cand .num { position: absolute; left: 8px; top: 8px; background: rgba(0,0,0,0.7); color: var(--fg); border-radius: 999px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
@@ -112,21 +112,21 @@ h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted); font-weight: 600; t
 .scene-item .anchor { color: var(--muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Zaman çizelgesi: şerit renkleri */
-.timeline { --c-foto: #00e08a; --c-haber: #ffb020; --c-ekran: #38c7ff; --c-anim: #b18cff; user-select: none; min-width: 0; }
+.timeline { --c-foto: #00e08a; --c-haber: #ffb020; --c-ekran: #38c7ff; --c-anim: #b18cff; --c-ust: #ff71ce; user-select: none; min-width: 0; }
 .tl-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; font-size: 12.5px; flex-wrap: wrap; }
 .tl-toolbar input[type='range'] { width: 150px; margin: 0; }
 .tl-toolbar button.small { min-width: 30px; }
 
 .tl-map { position: relative; height: 30px; margin-bottom: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; overflow: hidden; }
 .tl-map .m { position: absolute; height: 4px; border-radius: 1px; opacity: 0.85; }
-.tl-map .m.foto { background: var(--c-foto); } .tl-map .m.haber { background: var(--c-haber); } .tl-map .m.ekran { background: var(--c-ekran); } .tl-map .m.anim { background: var(--c-anim); }
+.tl-map .m.foto { background: var(--c-foto); } .tl-map .m.haber { background: var(--c-haber); } .tl-map .m.ekran { background: var(--c-ekran); } .tl-map .m.anim { background: var(--c-anim); } .tl-map .m.ust { background: var(--c-ust); }
 .tl-map .view { position: absolute; top: 0; bottom: 0; border: 1.5px solid var(--fg); border-radius: 4px; background: rgba(230, 237, 243, 0.08); min-width: 6px; }
 .tl-map .head { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--danger); }
 
 .tl-body { display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .tl-labels { flex: 0 0 116px; border-right: 1px solid var(--line); background: var(--panel); z-index: 4; }
 .tl-label { display: flex; align-items: center; padding: 0 10px; font-size: 12px; border-top: 1px solid rgba(36, 48, 64, 0.6); border-left: 3px solid transparent; }
-.tl-label.foto { border-left-color: var(--c-foto); } .tl-label.haber { border-left-color: var(--c-haber); } .tl-label.ekran { border-left-color: var(--c-ekran); } .tl-label.anim { border-left-color: var(--c-anim); }
+.tl-label.foto { border-left-color: var(--c-foto); } .tl-label.haber { border-left-color: var(--c-haber); } .tl-label.ekran { border-left-color: var(--c-ekran); } .tl-label.anim { border-left-color: var(--c-anim); } .tl-label.ust { border-left-color: var(--c-ust); }
 .tl-scroll { flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; }
 .tl-inner { position: relative; }
 .ruler { position: relative; border-bottom: 1px solid var(--line); cursor: ew-resize; background: var(--panel2); }
@@ -138,6 +138,7 @@ h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted); font-weight: 600; t
 .block.haber { background: rgba(255, 176, 32, 0.20); border-color: var(--c-haber); }
 .block.ekran { background: rgba(56, 199, 255, 0.20); border-color: var(--c-ekran); }
 .block.anim { background: rgba(177, 140, 255, 0.20); border-color: var(--c-anim); }
+.block.ust { background: rgba(255, 113, 206, 0.20); border-color: var(--c-ust); }
 .block.danger { box-shadow: inset 3px 0 0 var(--danger); }
 .block.suggested { border-style: dashed; }
 .block.missing { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0 6px, transparent 6px 12px); }

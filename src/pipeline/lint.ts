@@ -1,10 +1,12 @@
 // Skill'in "İç Kalite Kontrol" listesinin makineyle kontrol edilebilen kısmı + işaret sözlüğü denetimi.
 
 import fs from 'node:fs';
+import {OVERLAY_TYPES} from '../shared/marker-schema';
 import type {Marker} from '../shared/types';
 import {isValidFileName} from './markers';
 import type {Issue, ParsedScript} from './parse-script';
 import {normalizeWord} from './text';
+import {staticVisualChecks} from './visual-checks';
 
 // Konuşma hızı varsayımı: ~150 kelime/dakika (skill: 15–30 sn ≈ 40–75 kelime).
 export const WORDS_PER_SEC = 2.5;
@@ -75,7 +77,7 @@ export const lintScript = (s: ParsedScript, opts: {skillPath?: string} = {}): Li
   // ── İşaretler
   const ms = s.markers;
   const kaynak = (s.trailing['Kaynaklar'] ?? []).join('\n');
-  if (ms.some((m) => ['HABER', 'BELGE', 'FOTO', 'POST'].includes(m.kind)) && !kaynak)
+  if (ms.some((m) => ['HABER', 'BELGE', 'FOTO', 'KLİP', 'POST'].includes(m.kind)) && !kaynak)
     add(1, 'hata', '"## Kaynaklar" tablosu yok ama gerçek görsel işaretleri var');
 
   for (const m of ms) {
@@ -85,7 +87,7 @@ export const lintScript = (s: ParsedScript, opts: {skillPath?: string} = {}): Li
     if ((p.type === 'news' || p.type === 'document') && p.highlight === null) add(m.line, 'bilgi', 'vurgula: ? — "Kayıttan Önce Doğrulanacaklar"a eklendiğinden emin ol');
     if (kaynak) {
       // ara: sorgulu FOTO'nun satırı, aday seçilince (npm run foto) tabloya otomatik yazılır.
-      const key = p.type === 'news' ? p.url : p.type === 'post' ? p.handle : p.type === 'document' || (p.type === 'photo' && !p.search) ? p.file : null;
+      const key = p.type === 'news' ? p.url : p.type === 'post' ? p.handle : p.type === 'document' || ((p.type === 'photo' || p.type === 'clip') && !p.search) ? p.file : null;
       if (key && !kaynak.includes(key)) add(m.line, 'uyarı', `"Kaynaklar" tablosunda karşılığı yok: ${key}`);
     }
   }
@@ -100,6 +102,9 @@ export const lintScript = (s: ParsedScript, opts: {skillPath?: string} = {}): Li
     if (!real.length) add(sec.line, 'uyarı', `"${sec.title}" bölümü tarihten bir hikâye anlatıyor (${[...new Set(years)].join(', ')}) ama gerçek görsel yok: arşiv fotoğrafı (FOTO) ya da belge ekle`);
   }
 
+  // Ekranda okunabilirlik, tür çeşitliliği, ekrandaki rakamın söylenenle aynılığı.
+  issues.push(...staticVisualChecks(ms, s.sentences));
+
   const danger = ms.filter((m) => m.danger).length;
   if (ms.length && danger / ms.length > 0.15) add(1, 'uyarı', `Tehlike tonu işaretlerin %${Math.round((danger / ms.length) * 100)}'ünde (en fazla %15)`);
   const suggested = ms.filter((m) => m.suggested).length;
@@ -107,6 +112,8 @@ export const lintScript = (s: ParsedScript, opts: {skillPath?: string} = {}): Li
 
   // ── Yoğunluk
   const anchored = ms.filter((m) => m.sentenceIndex >= 0).sort((a, b) => a.sentenceIndex - b.sentenceIndex);
+  // Alt bant ve vurgu yüzü kapatmaz: tam ekran sayımına ve "kamerada kalmalı" denetimine girmez.
+  const fullScreen = anchored.filter((m) => !OVERLAY_TYPES.has(m.props.type) && m.layout !== 'yan');
   const wordAt = (si: number) => s.sentences[si]?.wordStart ?? 0;
   if (talking) {
     const avg = s.words.length / Math.max(1, ms.length);
@@ -125,17 +132,17 @@ export const lintScript = (s: ParsedScript, opts: {skillPath?: string} = {}): Li
       if (run.length > 2) add(run[0].line, 'uyarı', `Art arda ${run.length} tam ekran kesme (satır ${run[0].line}–${run.at(-1)!.line}); en fazla 2, sonra yüze dön`);
       run = [];
     };
-    for (const m of anchored) {
+    for (const m of fullScreen) {
       const p = run.at(-1);
       if (p && m.sentenceIndex - p.sentenceIndex > 1) flush();
       run.push(m);
     }
     flush();
     // Açılışın ilk cümlesi ve kapanış cümlesi kamerada kalır.
-    const first = anchored[0];
+    const first = fullScreen[0];
     if (first && first.sentenceIndex === 0) add(first.line, 'uyarı', 'Açılışın ilk cümlesi kamerada kalmalı');
     const closingIdx = s.sentences.length - 2; // imzadan önceki cümle
-    for (const m of anchored) if (m.sentenceIndex >= closingIdx && closingIdx > 0) add(m.line, 'uyarı', 'Kapanış cümlesi kamerada kalmalı');
+    for (const m of fullScreen) if (m.sentenceIndex >= closingIdx && closingIdx > 0) add(m.line, 'uyarı', 'Kapanış cümlesi kamerada kalmalı');
   } else {
     let prevW = 0;
     let prevLine = 1;
