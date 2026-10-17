@@ -19,6 +19,25 @@ import type {Scene, ScenesFile} from '../src/shared/types';
 
 const PORT = Number(process.env.PORT ?? 3030);
 const app = express();
+
+// ── Yerel API koruması ─────────────────────────────────────────────────────
+// Sunucu yalnızca 127.0.0.1'i dinliyor ama tarayıcıda açık herhangi bir site de oraya istek atabilir.
+// - Host denetimi: DNS rebinding (kötü bir alan adının 127.0.0.1'e çözülmesi) ile okuma yapılamasın.
+// - Origin denetimi: başka bir sitenin sayfası proje silemesin, render başlatamasın.
+// - Değiştiren isteklerde (POST/PUT/PATCH/DELETE) `X-YTE: 1` başlığı: özel başlık tarayıcıyı CORS ön
+//   kontrolüne zorlar; sunucu ona izin vermediği için başka kökenden gelen form/fetch isteği hiç ulaşmaz.
+// İzinli: uygulamanın kendisi (localhost/127.0.0.1:PORT) ve Vite geliştirme sunucusu (:5173).
+const ALLOWED_HOSTS = new Set([`localhost:${PORT}`, `127.0.0.1:${PORT}`, `[::1]:${PORT}`, 'localhost:5173', '127.0.0.1:5173']);
+const ALLOWED_ORIGINS = new Set([...ALLOWED_HOSTS].map((h) => `http://${h}`));
+const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+app.use((req, res, next) => {
+  if (!ALLOWED_HOSTS.has(String(req.headers.host ?? '').toLowerCase())) return void res.status(403).json({error: 'Bu sunucu yalnızca yerel uygulamaya açık'});
+  const origin = req.headers.origin;
+  if (origin !== undefined && !ALLOWED_ORIGINS.has(origin)) return void res.status(403).json({error: 'İzin verilmeyen köken'});
+  if (MUTATING.has(req.method) && req.headers['x-yte'] !== '1') return void res.status(403).json({error: 'Eksik X-YTE başlığı'});
+  next();
+});
+
 app.use(express.json({limit: '20mb'}));
 
 // ── Proje modeli ───────────────────────────────────────────────────────────

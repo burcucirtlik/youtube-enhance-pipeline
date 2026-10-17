@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {api} from '../api';
+import {api, YTE_HEADER} from '../api';
 import {navigate} from '../App';
 
 export const NewProject: React.FC = () => {
@@ -25,6 +25,7 @@ export const NewProject: React.FC = () => {
     // Büyük video dosyaları için yükleme ilerlemesi: XMLHttpRequest.
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/projects');
+    for (const [k, v] of Object.entries(YTE_HEADER)) xhr.setRequestHeader(k, v);
     xhr.upload.onprogress = (ev) => ev.lengthComputable && setProgress(ev.loaded / ev.total);
     xhr.onload = () => {
       setBusy(false);

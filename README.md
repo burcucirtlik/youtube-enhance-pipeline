@@ -41,6 +41,8 @@ Akış:
 
 **Disk:** kurgu kayıtları ortak bir medya deposunda (`.media/`, içerik özetiyle) bir kez tutulur; projelerdeki `footage/kurgu.mp4` ona sabit bağlantıdır (hardlink). Aynı video iki projeye yüklenirse diskte bir kez yer kaplar; uygulama açılışta var olan projeleri de tarar. Proje listesi her projenin boyutunu, başka projeyle ortak kısmını ve temizlenebilir kısmını gösterir. **Temizle** yeniden üretilebilir dosyaları siler (Commons aday fotoğrafları, görsel katmanı, yarım render); script, kurgu kaydı, seçilen fotoğraflar, düzenlemeler, haber/belge görüntüleri ve son video kalır. **Arşivle** projeyi listenin altına alır ve temizler. Proje silinince kaydını başka proje kullanmıyorsa depodan da silinir.
 
+**Güvenlik:** sunucu yalnızca 127.0.0.1'i dinler ve yalnızca uygulamanın kendisinden gelen istekleri kabul eder: `Host` başlığı `localhost`/`127.0.0.1` olmalı (DNS rebinding'e karşı), tarayıcı isteklerinde `Origin` uygulamanın adresi olmalı, değiştiren isteklerde (POST/PUT/DELETE) `X-YTE: 1` başlığı zorunlu. Böylece tarayıcıda açık başka bir site projelere dokunamaz. Komut satırından API'yi denerken: `curl -X POST -H 'X-YTE: 1' …`.
+
 Geliştirme: `npm run server` (API, :3030) ve `npm run ui:dev` (Vite, :5173). Tarayıcıda `http://localhost:5173`. Uygulama arayüzü `dist/ui` altına `npm run ui:build` ile derlenir; `npm run app` bunu kendisi yapar.
 
 ## Kurulum (bir kere)

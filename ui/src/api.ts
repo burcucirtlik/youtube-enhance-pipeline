@@ -47,12 +47,14 @@ const j = async <T,>(res: Response): Promise<T> => {
   if (!res.ok) throw new Error((body as any).error ?? `${res.status} ${res.statusText}`);
   return body as T;
 };
-const json = (method: string, body?: unknown): RequestInit => ({method, headers: {'Content-Type': 'application/json'}, body: body === undefined ? undefined : JSON.stringify(body)});
+/** Sunucu, değiştiren isteklerde bu başlığı ister (başka sitelerin isteklerini ayırmak için; bkz. server/index.ts). */
+export const YTE_HEADER = {'X-YTE': '1'} as const;
+const json = (method: string, body?: unknown): RequestInit => ({method, headers: {'Content-Type': 'application/json', ...YTE_HEADER}, body: body === undefined ? undefined : JSON.stringify(body)});
 
 export const api = {
   projects: () => fetch('/api/projects').then(j<ProjectSummary[]>),
   project: (id: string) => fetch(`/api/projects/${id}`).then(j<ProjectDetail>),
-  create: (form: FormData) => fetch('/api/projects', {method: 'POST', body: form}).then(j<ProjectDetail>),
+  create: (form: FormData) => fetch('/api/projects', {method: 'POST', headers: YTE_HEADER, body: form}).then(j<ProjectDetail>),
   prepare: (id: string, force = false) => fetch(`/api/projects/${id}/prepare`, json('POST', {force})).then(j<ProjectSummary>),
   photos: (id: string, selections: Record<string, number[]>) => fetch(`/api/projects/${id}/photos`, json('POST', {selections})).then(j<ProjectDetail & {results: Record<string, string>}>),
   saveScenes: (id: string, scenes: Pick<Scene, 'markerId' | 'startSec' | 'endSec' | 'disabled'>[]) => fetch(`/api/projects/${id}/scenes`, json('PUT', {scenes})).then(j<{edits: number; scenes: ScenesFile}>),
@@ -64,7 +66,7 @@ export const api = {
   archive: (id: string, archived: boolean) => fetch(`/api/projects/${id}/archive`, json('POST', {archived})).then(j<ProjectSummary & {freed: number}>),
   remove: (id: string) => fetch(`/api/projects/${id}`, json('DELETE')).then(j<{ok: true}>),
   cancel: (id: string) => fetch(`/api/projects/${id}/cancel`, json('POST')).then(j<{ok: true}>),
-  uploadFiles: (id: string, form: FormData) => fetch(`/api/projects/${id}/files`, {method: 'POST', body: form}).then(j<ProjectDetail>),
+  uploadFiles: (id: string, form: FormData) => fetch(`/api/projects/${id}/files`, {method: 'POST', headers: YTE_HEADER, body: form}).then(j<ProjectDetail>),
   /** Çalışan işin olay akışı. Dönen fonksiyon aboneliği kapatır. */
   events: (id: string, onEvent: (e: RunEvent) => void, onEnd: (err: string | null) => void) => {
     const es = new EventSource(`/api/projects/${id}/events`);
