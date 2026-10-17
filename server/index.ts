@@ -196,7 +196,7 @@ app.get('/api/projects/:id/events', (req, res) => {
 
 // ── Projeler ───────────────────────────────────────────────────────────────
 
-app.get('/api/health', (_req, res) => res.json({ok: true, root: ROOT}));
+app.get('/api/health', (_req, res) => res.json({ok: true, root: ROOT, node: process.version, arch: process.arch}));
 
 app.get('/api/projects', (_req, res) => {
   fs.mkdirSync(VIDEOS, {recursive: true});

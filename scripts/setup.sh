@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Tek seferlik kurulum: npm paketleri, Python ortamı (PDF vurgusu için PyMuPDF), Chromium (haber ekran görüntüleri).
+# Tek seferlik kurulum: projeye özel Node (.runtime/node), npm paketleri, Python ortamı (PDF vurgusu için PyMuPDF),
+# Chromium (haber ekran görüntüleri). Paketler bu Node ile kurulur ki yerel ikililer (Remotion, esbuild) doğru mimaride olsun.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+bash scripts/setup-node.sh
+export PATH="$PWD/.runtime/node/bin:$PATH"
 npm install
 # Apple Silicon'da Python paketleri her zaman arm64 kurulur (Node Rosetta altında olsa bile).
 PYRUN=""

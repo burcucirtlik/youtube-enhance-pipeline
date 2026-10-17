@@ -30,7 +30,8 @@ EOF
 # Başlatıcı Terminal açmadan çalışır; çıktılar ~/Library/Logs'a yazılır.
 cat > "$APP/Contents/MacOS/launch" <<EOF
 #!/bin/bash
-export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.nvm/current/bin:\$PATH"
+# Önce projenin kendi Node'u (.runtime/node, arm64), yoksa sistemdeki.
+export PATH="$ROOT/.runtime/node/bin:/usr/local/bin:/opt/homebrew/bin:\$HOME/.nvm/current/bin:\$PATH"
 LOG="\$HOME/Library/Logs/YouTubeEnhance.log"
 cd "$ROOT" || { osascript -e 'display alert "YouTube Enhance" message "Proje klasörü bulunamadı: $ROOT"'; exit 1; }
 if [ -z "\$(command -v node)" ]; then osascript -e 'display alert "YouTube Enhance" message "Node bulunamadı. Terminalde \"npm run app\" ile dene."'; exit 1; fi

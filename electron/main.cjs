@@ -1,6 +1,7 @@
 // Electron kabuğu: yerel pipeline sunucusunu başlatır, hazır olunca pencerede açar.
 const {app, BrowserWindow, shell} = require('electron');
 const {spawn} = require('node:child_process');
+const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 
@@ -21,11 +22,18 @@ const isUp = () =>
 
 const startServer = async () => {
   if (await isUp()) return; // dışarıdan (npm run server) zaten çalışıyor
-  // Sunucu sistemin Node'uyla çalışır (tsx); Electron'un Node'u değil. Kendi süreç grubunda başlar ki
-  // kapanışta tsx + node + (sunucunun bıraktığı her şey) tek seferde sonlandırılabilsin.
+  // Sunucu projenin kendi Node'uyla (.runtime/node, arm64) çalışır; yoksa sistemdekiyle. Electron'un Node'u değil.
+  // PATH'in başına da o konur ki render (npx remotion) gibi alt süreçler aynı mimaride çalışsın.
+  // Kendi süreç grubunda başlar ki kapanışta tsx + node + (sunucunun bıraktığı her şey) tek seferde sonlandırılabilsin.
   // YTE_PARENT_PID: Electron çökerse sunucu bunu fark edip kendini kapatır.
-  const env = {...process.env, PORT: String(PORT), YTE_PARENT_PID: String(process.pid), PATH: `${process.env.PATH || ''}:/usr/local/bin:/opt/homebrew/bin`};
-  server = spawn(path.join(ROOT, 'node_modules/.bin/tsx'), ['server/index.ts'], {cwd: ROOT, env, stdio: 'inherit', detached: true});
+  const runtimeBin = path.join(ROOT, '.runtime/node/bin');
+  const hasRuntime = fs.existsSync(path.join(runtimeBin, 'node'));
+  const PATH = [hasRuntime && runtimeBin, process.env.PATH, '/usr/local/bin', '/opt/homebrew/bin'].filter(Boolean).join(':');
+  const env = {...process.env, PORT: String(PORT), YTE_PARENT_PID: String(process.pid), PATH};
+  const [cmd, args] = hasRuntime
+    ? [path.join(runtimeBin, 'node'), [path.join(ROOT, 'node_modules/tsx/dist/cli.mjs'), 'server/index.ts']]
+    : [path.join(ROOT, 'node_modules/.bin/tsx'), ['server/index.ts']];
+  server = spawn(cmd, args, {cwd: ROOT, env, stdio: 'inherit', detached: true});
   server.on('exit', (code) => {
     server = null;
     if (code && code !== 0) console.error(`Sunucu çıktı (kod ${code})`);

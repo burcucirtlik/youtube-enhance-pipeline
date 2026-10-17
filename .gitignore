@@ -1,6 +1,7 @@
 # Bağımlılıklar ve derleme çıktıları
 node_modules/
 .venv/
+.runtime/
 dist/
 .uploads/
 *.log

@@ -41,7 +41,15 @@ Geliştirme: `npm run server` (API, :3030) ve `npm run ui:dev` (Vite, :5173). Ta
 npm run setup
 ```
 
-Kurulanlar: npm paketleri (Remotion, Playwright), `.venv` içinde Python (yalnızca PyMuPDF, PDF vurgusu için), Chromium.
+Kurulanlar: projeye özel Node (`.runtime/node`, Apple Silicon'da arm64; render Rosetta'ya göre ~3 kat hızlı), npm paketleri (Remotion, Playwright), `.venv` içinde Python (yalnızca PyMuPDF, PDF vurgusu için), Chromium.
+
+Terminalden `npm run …` komutlarını bu Node'la çalıştırmak için önce:
+
+```bash
+export PATH="$PWD/.runtime/node/bin:$PATH"
+```
+
+Masaüstü ikonu ve uygulama bunu kendisi yapar.
 
 ## Bir videonun akışı
 
