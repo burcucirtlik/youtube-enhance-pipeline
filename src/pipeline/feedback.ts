@@ -22,7 +22,7 @@ export const markerKey = (s: Pick<Scene, 'kind' | 'props'>) => (s.kind === 'ANİ
 const MOVE_EPS = 0.3; // saniye; sürüklemede bundan küçük oynamalar sayılmaz
 /**
  * Bundan uzak kaydırma "zamanlama düzeltmesi" değil, görseli başka bir cümleye taşımaktır (ya da eski bir hizalamadan
- * kalmış düzenlemedir); kaydırma ortancasına katılmaz, skill'e "daha erken gir" gibi yanlış ders vermesin.
+ * kalmış düzenlemedir; 2026-10-17'de Hakaret-2'de böyle 37 düzenleme bulundu); kaydırma ortancasına katılmaz, skill'e "daha erken gir" gibi yanlış ders vermesin.
  */
 const RELOCATE_SEC = 10;
 
