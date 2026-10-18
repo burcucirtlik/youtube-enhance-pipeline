@@ -6,7 +6,7 @@ import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type {Marker} from '../shared/types';
-import {paths, pickScript} from './util';
+import {isSafeAssetName, paths, pickScript} from './util';
 
 const API = 'https://commons.wikimedia.org/w/api.php';
 // Wikimedia, istemcinin kendini tanıtmasını istiyor.
@@ -242,6 +242,8 @@ const toProvenance = (file: string, c: Candidate): Provenance => ({file, title: 
  * ve aynı cümlenin süresi aralarında bölünür (align bunları ayrı sahnelere açar).
  */
 export const selectCandidates = (dir: string, file: string, picks: number[]): {provenance: Provenance; scriptUpdated: boolean} => {
+  // Ad arayüzden gelir; klasör ya da ".." içeren bir ad assets/ dışına kopyalardı.
+  if (!isSafeAssetName(file)) throw new Error(`Geçersiz dosya adı: ${file}`);
   const set = loadCandidateSet(dir, file);
   if (!set) throw new Error(`${file} için aday yok. Önce: npm run assets`);
   const uniq = [...new Set(picks)].filter((n) => Number.isInteger(n) && n >= 1);

@@ -8,5 +8,18 @@
  },
  "k49547c78": {
   "startSec": 363.7
+ },
+ "k3fc5939f": {
+  "startSec": 972.48,
+  "endSec": 974.93,
+  "disabled": true
+ },
+ "k33df7331": {
+  "startSec": 974.89,
+  "endSec": 981.48,
+  "disabled": true
+ },
+ "kebe5bffc": {
+  "disabled": true
  }
 }

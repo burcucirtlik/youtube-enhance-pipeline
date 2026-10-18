@@ -71,8 +71,44 @@ export const pickScript = (dir: string): string => {
   throw new Error(`${dir} içinde script.md yok`);
 };
 
-const VIDEO_EXT = ['.mp4', '.mov', '.m4v', '.mkv', '.webm'];
-const AUDIO_EXT = ['.wav', '.mp3', '.m4a', '.aac', '.flac'];
+export const VIDEO_EXT = ['.mp4', '.mov', '.m4v', '.mkv', '.webm'];
+export const AUDIO_EXT = ['.wav', '.mp3', '.m4a', '.aac', '.flac'];
+
+// ── Güvenlik yardımcıları ──────────────────────────────────────────────────
+
+/**
+ * Dışarıdan (arayüz, script) gelen bir varlık dosya adı yalnızca düz bir ad olabilir: klasör yok, ".." yok,
+ * gizli dosya yok, uzantı bilinen medya uzantılarından. Aksi halde `assets/` dışına yazılabilirdi (2026-10-18).
+ */
+export const isSafeAssetName = (name: unknown): name is string =>
+  typeof name === 'string' && /^[a-z0-9][a-z0-9._-]{0,120}\.(jpe?g|png|webp|gif|mp4|webm|mov|m4v|pdf)$/i.test(name) && !name.includes('..') && path.basename(name) === name;
+
+/**
+ * HABER linki tarayıcıda (Playwright) açılır; yalnızca herkese açık http(s) adresleri açılmalı. file://, data:, javascript:
+ * ve yerel ağ/loopback adresleri reddedilir: aksi halde script'e yazılan bir link bu bilgisayardaki bir dosyanın ya da
+ * yerel bir servisin ekran görüntüsünü alabilirdi (2026-10-18).
+ */
+export const isPublicHttpUrl = (u: unknown): boolean => {
+  if (typeof u !== 'string') return false;
+  let x: URL;
+  try {
+    x = new URL(u);
+  } catch {
+    return false;
+  }
+  if (x.protocol !== 'http:' && x.protocol !== 'https:') return false;
+  if (x.username || x.password) return false;
+  const h = x.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (!h || h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') || h.endsWith('.internal')) return false;
+  if (h === '::1' || h === '::' || h.startsWith('fe80:') || h.startsWith('fc') || h.startsWith('fd')) return false;
+  const m = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    if (a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224) return false;
+  }
+  if (/^0x|^\d+$/.test(h)) return false; // 0x7f000001, 2130706433 gibi yazımlar
+  return true;
+};
 
 /** footage/ içindeki kurgu kaydı: talking head için video, teknik eğitim için seslendirme. */
 export const findBaseMedia = (dir: string): {file: string; kind: 'video' | 'audio'} => {

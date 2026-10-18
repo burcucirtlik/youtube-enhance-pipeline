@@ -7,7 +7,7 @@ import path from 'node:path';
 import type {Marker} from '../shared/types';
 import type {ParsedScript} from './parse-script';
 import {fetchCandidates, geocodePlaces, loadPlaces} from './commons';
-import {assetKey, paths, python, ROOT} from './util';
+import {assetKey, isPublicHttpUrl, paths, python, ROOT} from './util';
 
 type Result = {line: number; what: string; status: 'hazır' | 'üretildi' | 'eksik' | 'uyarı'; note?: string};
 
@@ -124,13 +124,21 @@ const captureNews = async (
       results.push({line: m.line, what: `HABER ${(m.props as any).url}`, status: 'hazır'});
       return false;
     }
+    // Yalnızca herkese açık http(s) adresleri tarayıcıda açılır (file://, yerel ağ, loopback değil).
+    if (!isPublicHttpUrl((m.props as any).url)) {
+      results.push({line: m.line, what: `HABER ${(m.props as any).url}`, status: 'eksik', note: 'HABER linki herkese açık bir http(s) adresi olmalı; yerel dosya ve yerel ağ adresleri açılmaz'});
+      return false;
+    }
     return true;
   });
   if (!todo.length) return;
 
   const {chromium} = await import('playwright');
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({viewport: {width: 1600, height: 1000}, deviceScaleFactor: 2, locale: 'tr-TR'});
+  // Üçüncü taraf sayfalar güvenilmez içeriktir: indirme kabul edilmez, service worker kurulmaz, sayfanın kendi
+  // istekleri de (iframe, yönlendirme) yalnızca herkese açık http(s) adreslerine gidebilir.
+  const ctx = await browser.newContext({viewport: {width: 1600, height: 1000}, deviceScaleFactor: 2, locale: 'tr-TR', acceptDownloads: false, serviceWorkers: 'block'});
+  await ctx.route('**/*', (route) => (isPublicHttpUrl(route.request().url()) ? route.continue() : route.abort()));
   try {
     for (const m of todo) {
       const pr = m.props;
@@ -143,10 +151,14 @@ const captureNews = async (
         await dismissOverlays(page);
         const found = pr.highlight ? await page.evaluate<boolean>(FIND_TEXT(pr.highlight)) : false;
         await page.waitForTimeout(600);
-        const rects = found ? await page.evaluate<{x: number; y: number; width: number; height: number}[]>(RECTS) : [];
+        // Sayfadan dönen değerlere güvenilmez: yalnızca sonlu sayılardan oluşan kutular alınır.
+        const raw = found ? await page.evaluate<unknown>(RECTS) : [];
+        const rects = (Array.isArray(raw) ? raw : []).filter(
+          (r): r is {x: number; y: number; width: number; height: number} => !!r && typeof r === 'object' && ['x', 'y', 'width', 'height'].every((k) => Number.isFinite((r as any)[k])),
+        );
         const out = path.join(p.buildAssets, key + '.png');
         await page.screenshot({path: out});
-        const title = await page.title();
+        const title = String(await page.title()).slice(0, 300);
         fs.writeFileSync(
           path.join(p.buildAssets, key + '.json'),
           JSON.stringify({url: pr.url, title, highlight: pr.highlight, found: rects.length > 0, width: 3200, height: 2000, rects: rects.map((r) => ({x: r.x * 2, y: r.y * 2, width: r.width * 2, height: r.height * 2}))}, null, 1),

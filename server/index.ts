@@ -14,7 +14,7 @@ import {loadScript, photoStatus, renderUpToDate, stageAlign, stageFreshness, sta
 import {listJobLogs, loadState, readJobLog, saveJobLog} from '../src/pipeline/state';
 import {writeFeedback} from '../src/pipeline/feedback';
 import {cleanupPlan, diskUsage, gcMedia, ingestAll, ingestProject, runCleanup, type DiskUsage} from '../src/pipeline/media';
-import {ffprobe, findBaseMedia, paths, ROOT, VIDEOS} from '../src/pipeline/util';
+import {AUDIO_EXT, ffprobe, findBaseMedia, isSafeAssetName, paths, ROOT, VIDEO_EXT, VIDEOS} from '../src/pipeline/util';
 import type {Scene, ScenesFile} from '../src/shared/types';
 
 const PORT = Number(process.env.PORT ?? 3030);
@@ -30,13 +30,42 @@ const app = express();
 const ALLOWED_HOSTS = new Set([`localhost:${PORT}`, `127.0.0.1:${PORT}`, `[::1]:${PORT}`, 'localhost:5173', '127.0.0.1:5173']);
 const ALLOWED_ORIGINS = new Set([...ALLOWED_HOSTS].map((h) => `http://${h}`));
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+// - Sec-Fetch-Site: tarayıcı, başka bir sitenin sayfasından gelen <img>/<video>/<script> isteklerinde (Origin
+//   başlığı olmayan "no-cors" yüklemeler) bu başlığı "cross-site" yapar; onlar da reddedilir. Yanıtlara
+//   Cross-Origin-Resource-Policy: same-origin eklenir ki eski tarayıcılarda bile kurgu kaydı başka siteye yüklenemesin.
 app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Frame-Options', 'DENY');
   if (!ALLOWED_HOSTS.has(String(req.headers.host ?? '').toLowerCase())) return void res.status(403).json({error: 'Bu sunucu yalnızca yerel uygulamaya açık'});
   const origin = req.headers.origin;
   if (origin !== undefined && !ALLOWED_ORIGINS.has(origin)) return void res.status(403).json({error: 'İzin verilmeyen köken'});
+  if (req.headers['sec-fetch-site'] === 'cross-site') return void res.status(403).json({error: 'Başka siteden istek'});
   if (MUTATING.has(req.method) && req.headers['x-yte'] !== '1') return void res.status(403).json({error: 'Eksik X-YTE başlığı'});
   next();
 });
+
+/**
+ * Arayüz sayfasının içerik güvenliği politikası: script yalnızca kendi paketinden; stil ve font için Google Fonts
+ * (Remotion Player'ın yüklediği Chakra Petch / JetBrains Mono); görsel ve video kendi sunucusundan (blob: önizleme için).
+ * Arayüzde bir XSS açığı olsa bile dış sunucuya veri gönderemez, dış script çalıştıramaz. /files altındaki
+ * dosyalara (ör. CLI'ın ürettiği build/fotolar/index.html) uygulanmaz.
+ */
+const UI_CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob:",
+  "media-src 'self' blob: data:", // data: → Remotion Player'ın ses kilidini açmak için çaldığı sessiz mp3
+  "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com",
+  "worker-src 'self' blob:",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ');
 
 app.use(express.json({limit: '20mb'}));
 
@@ -283,6 +312,16 @@ const dropUploads = (req: Request) => {
 };
 
 const SUB_EXT = ['.srt', '.vtt'];
+const MEDIA_EXT = [...VIDEO_EXT, ...AUDIO_EXT];
+/** Yüklenen dosyaların uzantısı beyaz listeden; dosya adı kullanıcıdan gelir, olduğu gibi diske yazılmaz. */
+const mediaExt = (f: Express.Multer.File): string => {
+  const ext = path.extname(f.originalname).toLowerCase();
+  if (!MEDIA_EXT.includes(ext)) throw httpError(400, `Kurgu kaydı video ya da ses dosyası olmalı (${MEDIA_EXT.map((e) => e.slice(1)).join(', ')})`);
+  return ext;
+};
+const checkScript = (f: Express.Multer.File) => {
+  if (!/\.(md|txt|markdown)$/i.test(f.originalname)) throw httpError(400, 'Script .md dosyası olmalı');
+};
 const placeSubtitles = (dir: string, f: Express.Multer.File) => {
   const ext = path.extname(f.originalname).toLowerCase();
   if (!SUB_EXT.includes(ext)) throw httpError(400, 'Altyazı .srt ya da .vtt olmalı');
@@ -306,6 +345,10 @@ const createProject = (req: Request, res: Response) => {
   const subtitles = files?.subtitles?.[0];
   if (!script) throw httpError(400, 'İşaretli script dosyası (.md) gerekli');
   if (video && !subtitles) throw httpError(400, "Descript altyazısı (SRT) gerekli: Descript'te Export → Subtitles → SRT");
+  // Uzantı denetimleri klasör oluşturulmadan önce: hatalı yüklemede yarım proje kalmasın.
+  checkScript(script);
+  const videoExt = video ? mediaExt(video) : null;
+  if (subtitles && !SUB_EXT.includes(path.extname(subtitles.originalname).toLowerCase())) throw httpError(400, 'Altyazı .srt ya da .vtt olmalı');
   const scriptText = fs.readFileSync(script.path, 'utf8');
   const parsed = parseScript(scriptText);
   const title = (req.body.title as string)?.trim() || parsed.header.title || path.basename(script.originalname, '.md');
@@ -321,10 +364,7 @@ const createProject = (req: Request, res: Response) => {
   const isFinal = parsed.header.stage === 'kurgu-sonrası' || /final/i.test(script.originalname);
   fs.writeFileSync(isFinal ? p.scriptFinal : p.scriptMd, scriptText);
   fs.unlinkSync(script.path);
-  if (video) {
-    const ext = path.extname(video.originalname).toLowerCase() || '.mp4';
-    fs.renameSync(video.path, path.join(p.footage, `kurgu${ext}`));
-  }
+  if (video) fs.renameSync(video.path, path.join(p.footage, `kurgu${videoExt}`));
   // Descript altyazısı (SRT/VTT): pipeline'ın tek zamanlama kaynağı.
   if (subtitles) placeSubtitles(dir, subtitles);
   writeMeta(dir, {id, title, createdAt: new Date().toISOString()});
@@ -345,10 +385,12 @@ app.post('/api/projects/:id/files', upload.fields([{name: 'video', maxCount: 1},
     const video = files?.video?.[0];
     const script = files?.script?.[0];
     const subtitles = files?.subtitles?.[0];
+    if (script) checkScript(script);
+    const videoExt = video ? mediaExt(video) : null;
     if (subtitles) placeSubtitles(dir, subtitles);
     if (video) {
       for (const n of fs.readdirSync(p.footage)) if (/^kurgu\.(mp4|mov|m4v|mkv|webm|wav|mp3|m4a|aac|flac)$/i.test(n)) fs.rmSync(path.join(p.footage, n));
-      fs.renameSync(video.path, path.join(p.footage, `kurgu${path.extname(video.originalname).toLowerCase() || '.mp4'}`));
+      fs.renameSync(video.path, path.join(p.footage, `kurgu${videoExt}`));
       ingestLater(dir);
       gcMedia(); // eski kaydı başka proje kullanmıyorsa depodan da kalksın
     }
@@ -376,6 +418,9 @@ app.post('/api/projects/:id/photos', (req, res) => {
   const dir = projectDir(req.params.id);
   const selections = (req.body?.selections ?? {}) as Record<string, number[]>;
   const results: Record<string, string> = {};
+  // Adlar arayüzden gelir; klasör ya da ".." içeren bir ad assets/ dışına yazardı. Hiçbiri işlenmeden reddedilir.
+  const bad = Object.keys(selections).filter((f) => !isSafeAssetName(f));
+  if (bad.length) throw httpError(400, `Geçersiz dosya adı: ${bad.join(', ')}`);
   for (const [file, picks] of Object.entries(selections)) {
     if (!Array.isArray(picks) || !picks.length) continue;
     try {
@@ -506,8 +551,17 @@ app.use('/files', express.static(VIDEOS, {acceptRanges: true, fallthrough: false
 const uiDist = path.join(ROOT, 'dist/ui');
 if (fs.existsSync(uiDist)) {
   // index.html önbelleğe alınmasın: yeni derlemede hash'li paket adları değişir.
-  const noCache = {headers: {'Cache-Control': 'no-cache'}};
-  app.use(express.static(uiDist, {index: false, setHeaders: (res, file) => file.endsWith('.html') && res.setHeader('Cache-Control', 'no-cache')}));
+  const noCache = {headers: {'Cache-Control': 'no-cache', 'Content-Security-Policy': UI_CSP}};
+  app.use(
+    express.static(uiDist, {
+      index: false,
+      setHeaders: (res, file) => {
+        if (!file.endsWith('.html')) return;
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Content-Security-Policy', UI_CSP);
+      },
+    }),
+  );
   app.get(/^(?!\/api|\/files).*/, (_req, res) => res.sendFile(path.join(uiDist, 'index.html'), noCache));
 } else {
   app.get('/', (_req, res) => res.type('text').send('Arayüz derlenmemiş. Geliştirme: npm run ui:dev · Üretim: npm run ui:build'));

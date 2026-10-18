@@ -1,5 +1,5 @@
 // Electron kabuğu: yerel pipeline sunucusunu başlatır, hazır olunca pencerede açar.
-const {app, BrowserWindow, shell} = require('electron');
+const {app, BrowserWindow, session, shell} = require('electron');
 const {spawn} = require('node:child_process');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -54,24 +54,38 @@ const createWindow = () => {
     title: 'YouTube Enhance',
     backgroundColor: '#07090c',
     icon: path.join(__dirname, 'icon.png'),
-    webPreferences: {contextIsolation: true},
+    // Sayfa Node'a ve Electron API'lerine erişemez; pencere yalnızca yerel sunucunun arayüzünü gösterir.
+    webPreferences: {contextIsolation: true, nodeIntegration: false, sandbox: true, webviewTag: false},
   });
   win.loadURL(URL);
-  // Commons sayfaları gibi dış linkler sistem tarayıcısında açılır.
+  // Commons sayfaları gibi dış linkler sistem tarayıcısında açılır; uygulama penceresi asla dış siteye gitmez.
+  // Yalnızca http(s): başka bir şema (smb://, ssh://, dosya yolu) sistemde başka bir uygulama açabilirdi.
+  const openOutside = (url) => /^https?:\/\//i.test(url) && shell.openExternal(url);
   win.webContents.setWindowOpenHandler(({url}) => {
     if (!url.startsWith(URL)) {
-      shell.openExternal(url);
+      openOutside(url);
       return {action: 'deny'};
     }
     return {action: 'allow'};
   });
+  win.webContents.on('will-navigate', (e, url) => {
+    if (url.startsWith(URL)) return;
+    e.preventDefault();
+    openOutside(url);
+  });
+  win.webContents.on('will-attach-webview', (e) => e.preventDefault());
 };
+
+/** Sayfanın isteyebileceği izinler: tam ekran (oynatıcı) ve panoya yazma dışında hepsi reddedilir (kamera, mikrofon, konum, bildirim…). */
+const ALLOWED_PERMISSIONS = new Set(['fullscreen', 'clipboard-sanitized-write']);
 
 app.setName('YouTube Enhance');
 
 app.whenReady().then(async () => {
   // Dock'ta Electron'un değil kanalın ikonu görünsün.
   if (process.platform === 'darwin' && app.dock) app.dock.setIcon(path.join(__dirname, 'icon.png'));
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(ALLOWED_PERMISSIONS.has(permission)));
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => ALLOWED_PERMISSIONS.has(permission));
   try {
     await startServer();
   } catch (e) {
